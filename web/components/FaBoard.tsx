@@ -1,3 +1,5 @@
+import FilterPills from "@/components/FilterPills";
+import { buildTeamFilterOptions } from "@/lib/feedFilters";
 import type { FaPlayer, FaTeam } from "@/lib/types";
 
 const STATUS_ORDER = ["FA", "잔류", "이적", "계약미체결", "미정"] as const;
@@ -111,45 +113,26 @@ function BoardFilters({
   onTeamFilterChange: (teamId: string) => void;
   onStatusFilterChange: (status: string) => void;
 }) {
-  return (
-    <div className="rounded-2xl border border-brand-border/80 bg-brand-surface/80 p-4 shadow-card backdrop-blur-sm">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="space-y-1">
-          <span className="text-[10px] font-semibold uppercase tracking-label text-brand-muted">
-            팀
-          </span>
-          <select
-            value={teamFilter}
-            onChange={(e) => onTeamFilterChange(e.target.value)}
-            className="w-full rounded-xl border border-brand-border/80 bg-white px-3 py-2 text-sm text-[#222] outline-none ring-brand-primary/20 focus:ring-2"
-          >
-            <option value="all">전체</option>
-            {teams.map((t) => (
-              <option key={t.id} value={String(t.id)}>
-                {t.short_name}
-              </option>
-            ))}
-          </select>
-        </label>
+  const teamOptions = buildTeamFilterOptions(teams);
+  const statusOptions = [
+    { id: "all", label: "전체" },
+    ...STATUS_ORDER.map((s) => ({ id: s, label: s })),
+  ];
 
-        <label className="space-y-1">
-          <span className="text-[10px] font-semibold uppercase tracking-label text-brand-muted">
-            상태
-          </span>
-          <select
-            value={statusFilter}
-            onChange={(e) => onStatusFilterChange(e.target.value)}
-            className="w-full rounded-xl border border-brand-border/80 bg-white px-3 py-2 text-sm text-[#222] outline-none ring-brand-primary/20 focus:ring-2"
-          >
-            <option value="all">전체</option>
-            {STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+  return (
+    <div className="space-y-1">
+      <FilterPills
+        label="팀 필터"
+        options={teamOptions}
+        value={teamFilter}
+        onChange={onTeamFilterChange}
+      />
+      <FilterPills
+        label="상태 필터"
+        options={statusOptions}
+        value={statusFilter}
+        onChange={onStatusFilterChange}
+      />
     </div>
   );
 }

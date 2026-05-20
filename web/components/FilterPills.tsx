@@ -30,10 +30,10 @@ export default function FilterPills({
                 key={opt.id}
                 type="button"
                 onClick={() => onChange(opt.id)}
-                className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-[12px] font-medium transition ${
+                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[12px] font-semibold transition ${
                   active
-                    ? "border-brand-primary/25 bg-brand-primary/[0.08] text-brand-primary"
-                    : "border-brand-border/80 bg-brand-surface/70 text-brand-muted hover:bg-brand-cream"
+                    ? "border-brand-primary bg-brand-primary text-white shadow-sm"
+                    : "border-brand-border/80 bg-brand-surface/90 text-brand-muted hover:border-brand-primary/25 hover:bg-brand-cream hover:text-[#333]"
                 }`}
                 aria-pressed={active}
               >

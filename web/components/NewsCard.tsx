@@ -3,14 +3,20 @@
 import { useEffect, useState } from "react";
 import { formatKstDateTime } from "@/lib/formatDate";
 import type { LinkPreview } from "@/lib/linkPreview";
+import type { RelatedPlayerBadge } from "@/lib/feedFilters";
 import type { NewsItem } from "@/lib/types";
 
 interface NewsCardProps {
   item: NewsItem;
   isLatest?: boolean;
+  relatedPlayers?: RelatedPlayerBadge[];
 }
 
-export default function NewsCard({ item, isLatest = false }: NewsCardProps) {
+export default function NewsCard({
+  item,
+  isLatest = false,
+  relatedPlayers = [],
+}: NewsCardProps) {
   const keywords = item.matched_keywords ?? [];
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
@@ -94,12 +100,31 @@ export default function NewsCard({ item, isLatest = false }: NewsCardProps) {
           </p>
         ) : null}
 
+        {relatedPlayers.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {relatedPlayers.map((player) => (
+              <span
+                key={player.playerId}
+                className="rounded-full border border-brand-primary/20 bg-brand-primary/[0.06] px-2.5 py-0.5 text-[10px] font-semibold text-brand-primary"
+              >
+                {player.playerName}
+                {player.teamShortName ? (
+                  <span className="font-medium text-brand-primary/70">
+                    {" "}
+                    · {player.teamShortName}
+                  </span>
+                ) : null}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
         {keywords.length > 0 ? (
-          <div className="mt-3.5 flex flex-wrap gap-1.5">
+          <div className="mt-3 flex flex-wrap gap-1.5">
             {keywords.map((keyword) => (
               <span
                 key={keyword}
-                className="rounded-full border border-brand-primary/12 bg-brand-cream px-2.5 py-0.5 text-[10px] font-medium tracking-wide text-brand-primary"
+                className="rounded-full border border-brand-border/80 bg-brand-cream px-2.5 py-0.5 text-[10px] font-medium tracking-wide text-brand-muted"
               >
                 {keyword}
               </span>

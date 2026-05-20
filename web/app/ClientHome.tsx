@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FeedIntro from "@/components/FeedIntro";
 import FeedState from "@/components/FeedState";
+import FilterEmptyState from "@/components/FilterEmptyState";
 import FaBoard from "@/components/FaBoard";
 import Header from "@/components/Header";
 import FilterPills from "@/components/FilterPills";
@@ -16,6 +17,15 @@ import {
   fetchNewsItems,
   fetchNewsPlayerMentionsByNewsIds,
 } from "@/lib/supabase";
+import {
+  buildFeedMaps,
+  buildPlayerFilterOptions,
+  buildTeamFilterOptions,
+  filterNewsByMentions,
+  getFilterEmptyMessage,
+  getRelatedPlayersForNews,
+  isPlayerValidForTeamFilter,
+} from "@/lib/feedFilters";
 import type { FaPlayer, FaTeam, NewsItem, NewsPlayerMention } from "@/lib/types";
 import { logLoadError } from "@/lib/userFacingError";
 
@@ -77,55 +87,46 @@ export default function ClientHome() {
     void loadNews();
   }, [loadNews]);
 
+  const feedMaps = useMemo(
+    () => buildFeedMaps(teams, players, mentions),
+    [teams, players, mentions],
+  );
+
+  useEffect(() => {
+    if (loadState !== "success") return;
+    if (!isPlayerValidForTeamFilter(playerId, teamId, feedMaps.playerById)) {
+      setParam("player", "all");
+    }
+  }, [loadState, playerId, teamId, feedMaps.playerById, setParam]);
+
+  const filteredNews = useMemo(
+    () => filterNewsByMentions(items, mentions, players, teamId, playerId),
+    [items, mentions, players, teamId, playerId],
+  );
+
+  const newsCountByPlayerId = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const m of mentions) {
+      counts.set(m.player_id, (counts.get(m.player_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [mentions]);
+
+  const teamOptions = useMemo(() => buildTeamFilterOptions(teams), [teams]);
+  const playerOptions = useMemo(
+    () => buildPlayerFilterOptions(players, teamId),
+    [players, teamId],
+  );
+
   const newsCount = loadState === "success" ? items.length : undefined;
+  const hasAnyNews = loadState === "success" && items.length > 0;
+  const hasFilteredResults = loadState === "success" && filteredNews.length > 0;
+  const filterActive = teamId !== "all" || playerId !== "all";
 
-  const playerById = new Map(players.map((p) => [p.id, p]));
-
-  const mentionByNewsId = new Map<number, number[]>();
-  for (const m of mentions) {
-    const list = mentionByNewsId.get(m.news_item_id) ?? [];
-    list.push(m.player_id);
-    mentionByNewsId.set(m.news_item_id, list);
-  }
-
-  const newsCountByPlayerId = new Map<number, number>();
-  for (const m of mentions) {
-    newsCountByPlayerId.set(
-      m.player_id,
-      (newsCountByPlayerId.get(m.player_id) ?? 0) + 1,
-    );
-  }
-
-  const filteredNews = items.filter((news) => {
-    if (teamId === "all" && playerId === "all") return true;
-    const playerIds = mentionByNewsId.get(news.id) ?? [];
-    if (playerId !== "all") {
-      return playerIds.includes(Number(playerId));
-    }
-    if (teamId !== "all") {
-      for (const pid of playerIds) {
-        const p = playerById.get(pid);
-        if (p && String(p.team_id) === teamId) return true;
-      }
-      return false;
-    }
-    return true;
-  });
-
-  const showFeed = loadState === "success" && filteredNews.length > 0;
-
-  const teamOptions = [
-    { id: "all", label: "전체" },
-    ...teams.map((t) => ({ id: String(t.id), label: t.short_name })),
-  ];
-
-  const playerOptions = [
-    { id: "all", label: "전체" },
-    ...players
-      .slice()
-      .sort((a, b) => a.player_name.localeCompare(b.player_name, "ko"))
-      .map((p) => ({ id: String(p.id), label: p.player_name })),
-  ];
+  const handleTeamFilterChange = (id: string) => {
+    setParam("team", id);
+    setParam("player", "all");
+  };
 
   return (
     <div className="page-shell">
@@ -141,39 +142,19 @@ export default function ClientHome() {
 
         {tab === "feed" ? (
           <>
-            {loadState === "success" && items.length > 0 ? (
-              <FeedIntro newsCount={items.length} />
-            ) : null}
+            {hasAnyNews ? <FeedIntro newsCount={items.length} /> : null}
 
-            {loadState === "success" && items.length > 0 ? (
+            {hasAnyNews ? (
               <>
                 <FilterPills
                   label="팀 필터"
                   options={teamOptions}
                   value={teamId}
-                  onChange={(id) => {
-                    setParam("team", id);
-                    setParam("player", "all");
-                  }}
+                  onChange={handleTeamFilterChange}
                 />
                 <FilterPills
                   label="선수 필터"
-                  options={
-                    teamId === "all"
-                      ? playerOptions
-                      : [
-                          { id: "all", label: "전체" },
-                          ...players
-                            .filter((p) => String(p.team_id) === teamId)
-                            .sort((a, b) =>
-                              a.player_name.localeCompare(b.player_name, "ko"),
-                            )
-                            .map((p) => ({
-                              id: String(p.id),
-                              label: p.player_name,
-                            })),
-                        ]
-                  }
+                  options={playerOptions}
                   value={playerId}
                   onChange={(id) => setParam("player", id)}
                 />
@@ -184,15 +165,28 @@ export default function ClientHome() {
             {loadState === "error" && (
               <FeedState variant="error" onRetry={loadNews} />
             )}
-            {loadState === "success" && filteredNews.length === 0 && (
+            {loadState === "success" && !hasAnyNews && (
               <FeedState variant="empty" />
             )}
+            {loadState === "success" && hasAnyNews && !hasFilteredResults && (
+              <FilterEmptyState
+                message={getFilterEmptyMessage(teamId, playerId)}
+              />
+            )}
 
-            {showFeed ? (
+            {hasFilteredResults ? (
               <ul className="flex flex-col gap-6">
                 {filteredNews.map((item, index) => (
                   <li key={item.id}>
-                    <NewsCard item={item} isLatest={index === 0} />
+                    <NewsCard
+                      item={item}
+                      isLatest={index === 0 && !filterActive}
+                      relatedPlayers={getRelatedPlayersForNews(
+                        item.id,
+                        mentions,
+                        feedMaps,
+                      )}
+                    />
                   </li>
                 ))}
               </ul>
@@ -214,9 +208,14 @@ export default function ClientHome() {
                 onTeamFilterChange={(v) => setParam("bteam", v)}
                 onStatusFilterChange={(v) => setParam("bstatus", v)}
                 onSelectPlayer={(pid) => {
+                  const player = players.find((p) => p.id === pid);
                   const next = new URLSearchParams(searchParams.toString());
                   next.set("tab", "feed");
-                  next.delete("team");
+                  if (player) {
+                    next.set("team", String(player.team_id));
+                  } else {
+                    next.delete("team");
+                  }
                   next.set("player", String(pid));
                   router.replace(`/?${next.toString()}`);
                 }}
@@ -230,4 +229,3 @@ export default function ClientHome() {
     </div>
   );
 }
-
