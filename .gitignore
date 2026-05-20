@@ -1,0 +1,23 @@
+# Gradle
+collector/.gradle/
+collector/build/
+collector/bin/
+collector/out/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.class
+
+# Local secrets
+.env
+.env.*
+application-local.yml
+application-local.yaml
+**/application-local.yml
+**/application-local.yaml
+
+# OS
+.DS_Store
+Thumbs.db
