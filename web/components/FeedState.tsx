@@ -1,16 +1,12 @@
-import RedbooMark from "@/components/RedbooMark";
+import FaRadarMark from "@/components/FaRadarMark";
+import { USER_FACING_LOAD_ERROR } from "@/lib/userFacingError";
 
 interface FeedStateProps {
   variant: "loading" | "empty" | "error";
-  errorMessage?: string | null;
   onRetry?: () => void;
 }
 
-export default function FeedState({
-  variant,
-  errorMessage,
-  onRetry,
-}: FeedStateProps) {
+export default function FeedState({ variant, onRetry }: FeedStateProps) {
   if (variant === "loading") {
     return (
       <div className="rounded-2xl border border-brand-border/80 bg-brand-surface/95 px-6 py-16 text-center shadow-card backdrop-blur-sm">
@@ -19,7 +15,7 @@ export default function FeedState({
           피드를 불러오는 중
         </p>
         <p className="mt-1.5 text-xs leading-relaxed text-brand-muted">
-          오늘도 새로고침 대신, 여기서 기다립니다
+          KBL FA 시장 뉴스를 가져오고 있습니다
         </p>
       </div>
     );
@@ -29,15 +25,15 @@ export default function FeedState({
     return (
       <div className="rounded-2xl border border-brand-border/80 bg-brand-surface/95 px-6 py-14 text-center shadow-card backdrop-blur-sm">
         <div className="flex justify-center">
-          <RedbooMark size={52} className="opacity-95" />
+          <FaRadarMark />
         </div>
         <p className="mt-5 text-sm font-medium text-[#2a2a2a]">
           아직 감지된 뉴스가 없습니다
         </p>
-        <p className="mx-auto mt-2 max-w-[16rem] text-xs leading-[1.7] text-brand-muted">
-          새 기사가 감지되면 피드에 조용히 쌓입니다.
+        <p className="mx-auto mt-2 max-w-[18rem] text-xs leading-[1.7] text-brand-muted">
+          FA 시장 관련 기사가 수집되면
           <br />
-          FA 시장의 작은 신호도 놓치지 않기 위해.
+          이곳에 최신순으로 표시됩니다.
         </p>
       </div>
     );
@@ -48,9 +44,9 @@ export default function FeedState({
       <p className="text-sm font-medium text-brand-primary">
         피드를 불러오지 못했습니다
       </p>
-      {errorMessage ? (
-        <p className="mt-2 text-xs text-brand-muted">{errorMessage}</p>
-      ) : null}
+      <p className="mt-2 text-xs leading-relaxed text-brand-muted">
+        {USER_FACING_LOAD_ERROR}
+      </p>
       {onRetry ? (
         <button
           type="button"

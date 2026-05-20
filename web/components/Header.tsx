@@ -1,6 +1,6 @@
 "use client";
 
-import RedbooMark from "@/components/RedbooMark";
+import FaRadarMark from "@/components/FaRadarMark";
 import { formatKstCompact } from "@/lib/formatDate";
 
 type LoadState = "loading" | "success" | "error";
@@ -21,9 +21,9 @@ export default function Header({
   const isRefreshing = loadState === "loading";
 
   return (
-    <header className="sticky top-0 z-20 border-b border-brand-border/80 bg-brand-bg/75 backdrop-blur-sm supports-[backdrop-filter]:bg-brand-bg/65">
+    <header className="sticky top-0 z-20 border-b border-brand-border/80 bg-brand-bg/80 backdrop-blur-sm supports-[backdrop-filter]:bg-brand-bg/70">
       <div
-        className="h-px bg-gradient-to-r from-transparent via-brand-primary/50 to-transparent"
+        className="h-px bg-gradient-to-r from-transparent via-brand-primary/35 to-transparent"
         aria-hidden
       />
       <div className="mx-auto max-w-[640px] px-4 pb-3.5 pt-4">
@@ -50,18 +50,18 @@ function HeaderRow({
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <p className="text-[10px] font-semibold uppercase tracking-label text-brand-primary">
-          Anyang Red Boosters Watch
+          KBL FREE AGENCY WATCH
         </p>
         <h1 className="mt-2 text-[1.4rem] font-semibold leading-[1.2] tracking-tight text-[#1a1a1a]">
-          변준형 FA 뉴스 모니터
+          2026 KBL FA 레이더
         </h1>
         <p className="mt-2 max-w-[20rem] text-[13px] leading-[1.55] text-brand-muted sm:max-w-none">
-          새 소식이 뜨면 가장 먼저, 조용히 쌓아두는 FA 피드
+          FA 시장의 흐름을 팀별·선수별로 모아보는 KBL 뉴스 피드
         </p>
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-2.5 pt-0.5">
-        <RedbooMark size={48} className="rounded-xl ring-1 ring-brand-primary/10" />
+        <FaRadarMark />
         <button
           type="button"
           onClick={() => void loadNews()}

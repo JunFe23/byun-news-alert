@@ -17,6 +17,7 @@ import {
   fetchNewsPlayerMentionsByNewsIds,
 } from "@/lib/supabase";
 import type { FaPlayer, FaTeam, NewsItem, NewsPlayerMention } from "@/lib/types";
+import { logLoadError } from "@/lib/userFacingError";
 
 type LoadState = "loading" | "success" | "error";
 
@@ -29,7 +30,6 @@ export default function ClientHome() {
   const [players, setPlayers] = useState<FaPlayer[]>([]);
   const [mentions, setMentions] = useState<NewsPlayerMention[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const rawTab = searchParams.get("tab");
@@ -51,8 +51,6 @@ export default function ClientHome() {
 
   const loadNews = useCallback(async () => {
     setLoadState("loading");
-    setErrorMessage(null);
-
     try {
       const [news, teamRows, playerRows] = await Promise.all([
         fetchNewsItems(100),
@@ -70,11 +68,7 @@ export default function ClientHome() {
       setLastUpdated(new Date().toISOString());
       setLoadState("success");
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "뉴스를 불러오는 중 오류가 발생했습니다.";
-      setErrorMessage(message);
+      logLoadError("loadNews", error);
       setLoadState("error");
     }
   }, []);
@@ -188,11 +182,7 @@ export default function ClientHome() {
 
             {loadState === "loading" && <FeedState variant="loading" />}
             {loadState === "error" && (
-              <FeedState
-                variant="error"
-                errorMessage={errorMessage}
-                onRetry={loadNews}
-              />
+              <FeedState variant="error" onRetry={loadNews} />
             )}
             {loadState === "success" && filteredNews.length === 0 && (
               <FeedState variant="empty" />
@@ -212,11 +202,7 @@ export default function ClientHome() {
           <>
             {loadState === "loading" && <FeedState variant="loading" />}
             {loadState === "error" && (
-              <FeedState
-                variant="error"
-                errorMessage={errorMessage}
-                onRetry={loadNews}
-              />
+              <FeedState variant="error" onRetry={loadNews} />
             )}
             {loadState === "success" ? (
               <FaBoard

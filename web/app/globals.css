@@ -3,15 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --brand-primary: #7a1e2c;
-  --brand-primary-dark: #5c1521;
-  --brand-accent: #b8922e;
-  --brand-bg: #f6f2ee;
-  --brand-bg-tint: #efe6e4;
-  --brand-surface: #fffdfb;
-  --brand-border: #e6ddd6;
+  --brand-primary: #7a2438;
+  --brand-primary-dark: #5e1a2b;
+  --brand-accent: #a68b4b;
+  --brand-bg: #f3f1ee;
+  --brand-bg-tint: #ebe8e4;
+  --brand-surface: #ffffff;
+  --brand-border: #e4e0da;
   --brand-text: #1f1f1f;
-  --brand-text-muted: #6b6560;
+  --brand-text-muted: #5e5a55;
 }
 
 @layer base {
@@ -20,18 +20,18 @@
     background-color: var(--brand-bg);
     background-image:
       radial-gradient(
-        ellipse 140% 90% at 50% -30%,
-        rgba(122, 30, 44, 0.09),
+        ellipse 120% 80% at 50% -25%,
+        rgba(122, 36, 56, 0.06),
         transparent 55%
       ),
       radial-gradient(
-        ellipse 70% 50% at 100% 0%,
-        rgba(184, 146, 46, 0.05),
+        ellipse 65% 45% at 100% 0%,
+        rgba(166, 139, 75, 0.04),
         transparent 45%
       ),
       radial-gradient(
-        ellipse 60% 40% at 0% 100%,
-        rgba(122, 30, 44, 0.04),
+        ellipse 55% 35% at 0% 100%,
+        rgba(60, 58, 55, 0.03),
         transparent 50%
       );
     background-attachment: fixed;
@@ -49,7 +49,7 @@
   }
 
   ::selection {
-    background-color: rgba(122, 30, 44, 0.14);
+    background-color: rgba(122, 36, 56, 0.12);
     color: var(--brand-text);
   }
 }

@@ -28,7 +28,7 @@ export default function FaBoard({
           FA 선수 목록이 없습니다.
         </p>
         <p className="mt-2 text-xs leading-relaxed text-brand-muted">
-          Supabase의 <code>fa_players</code> 테이블을 확인해 주세요.
+          FA 선수 데이터가 준비되면 이곳에 표시됩니다.
         </p>
       </div>
     );
