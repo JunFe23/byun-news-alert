@@ -1,3 +1,4 @@
+import { sortPlayersForFilter, sortTeamsForFilter } from "@/lib/filterSort";
 import type { FaPlayer, FaTeam, NewsItem, NewsPlayerMention } from "@/lib/types";
 
 export type FeedMaps = {
@@ -8,32 +9,51 @@ export type FeedMaps = {
   newsIdsByPlayerId: Map<number, Set<number>>;
 };
 
+export function normalizeNumericId(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function buildFeedMaps(
   teams: FaTeam[],
   players: FaPlayer[],
   mentions: NewsPlayerMention[],
 ): FeedMaps {
-  const teamById = new Map(teams.map((t) => [t.id, t]));
-  const playerById = new Map(players.map((p) => [p.id, p]));
+  const teamById = new Map<number, FaTeam>();
+  for (const team of teams) {
+    const id = normalizeNumericId(team.id);
+    if (id !== null) teamById.set(id, team);
+  }
+
+  const playerById = new Map<number, FaPlayer>();
   const playersByTeamId = new Map<number, FaPlayer[]>();
   const mentionsByNewsId = new Map<number, NewsPlayerMention[]>();
   const newsIdsByPlayerId = new Map<number, Set<number>>();
 
   for (const player of players) {
-    const list = playersByTeamId.get(player.team_id) ?? [];
+    const playerId = normalizeNumericId(player.id);
+    const teamId = normalizeNumericId(player.team_id);
+    if (playerId === null || teamId === null) continue;
+
+    playerById.set(playerId, player);
+    const list = playersByTeamId.get(teamId) ?? [];
     list.push(player);
-    playersByTeamId.set(player.team_id, list);
+    playersByTeamId.set(teamId, list);
   }
 
   for (const mention of mentions) {
-    const byNews = mentionsByNewsId.get(mention.news_item_id) ?? [];
-    byNews.push(mention);
-    mentionsByNewsId.set(mention.news_item_id, byNews);
+    const newsId = normalizeNumericId(mention.news_item_id);
+    const playerId = normalizeNumericId(mention.player_id);
+    if (newsId === null || playerId === null) continue;
 
-    const byPlayer =
-      newsIdsByPlayerId.get(mention.player_id) ?? new Set<number>();
-    byPlayer.add(mention.news_item_id);
-    newsIdsByPlayerId.set(mention.player_id, byPlayer);
+    const byNews = mentionsByNewsId.get(newsId) ?? [];
+    byNews.push(mention);
+    mentionsByNewsId.set(newsId, byNews);
+
+    const byPlayer = newsIdsByPlayerId.get(playerId) ?? new Set<number>();
+    byPlayer.add(newsId);
+    newsIdsByPlayerId.set(playerId, byPlayer);
   }
 
   return {
@@ -47,14 +67,13 @@ export function buildFeedMaps(
 
 export function parseFilterId(value: string): number | null {
   if (value === "all" || value === "") return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
+  return normalizeNumericId(value);
 }
 
+/** news_player_mentions + fa_players.team_id 관계만 사용 (title/description 미사용) */
 export function filterNewsByMentions(
   newsItems: NewsItem[],
-  mentions: NewsPlayerMention[],
-  players: FaPlayer[],
+  maps: FeedMaps,
   teamFilter: string,
   playerFilter: string,
 ): NewsItem[] {
@@ -65,38 +84,46 @@ export function filterNewsByMentions(
     return newsItems;
   }
 
-  const teamPlayerIds =
-    selectedTeamId === null
-      ? null
-      : new Set(
-          players
-            .filter((p) => p.team_id === selectedTeamId)
-            .map((p) => p.id),
-        );
+  const teamPlayers = selectedTeamId
+    ? (maps.playersByTeamId.get(selectedTeamId) ?? [])
+    : [];
+  const teamPlayerIds = new Set(
+    teamPlayers
+      .map((p) => normalizeNumericId(p.id))
+      .filter((id): id is number => id !== null),
+  );
 
   return newsItems.filter((news) => {
-    const newsMentions = mentions.filter((m) => m.news_item_id === news.id);
+    const newsId = normalizeNumericId(news.id);
+    if (newsId === null) return false;
+
+    const newsMentions = maps.mentionsByNewsId.get(newsId) ?? [];
     if (newsMentions.length === 0) return false;
 
     if (selectedPlayerId !== null) {
-      return newsMentions.some((m) => m.player_id === selectedPlayerId);
+      return newsMentions.some(
+        (m) => normalizeNumericId(m.player_id) === selectedPlayerId,
+      );
     }
 
-    if (teamPlayerIds !== null) {
-      return newsMentions.some((m) => teamPlayerIds.has(m.player_id));
+    if (selectedTeamId !== null) {
+      return newsMentions.some((m) => {
+        const pid = normalizeNumericId(m.player_id);
+        return pid !== null && teamPlayerIds.has(pid);
+      });
     }
 
     return true;
   });
 }
 
-export function buildTeamFilterOptions(teams: FaTeam[]): { id: string; label: string }[] {
+export function buildTeamFilterOptions(
+  teams: FaTeam[],
+): { id: string; label: string }[] {
+  const sorted = sortTeamsForFilter(teams);
   return [
     { id: "all", label: "전체" },
-    ...teams
-      .slice()
-      .sort((a, b) => a.short_name.localeCompare(b.short_name, "ko"))
-      .map((t) => ({ id: String(t.id), label: t.short_name })),
+    ...sorted.map((t) => ({ id: String(t.id), label: t.short_name })),
   ];
 }
 
@@ -108,14 +135,15 @@ export function buildPlayerFilterOptions(
   const scoped =
     selectedTeamId === null
       ? players
-      : players.filter((p) => p.team_id === selectedTeamId);
+      : players.filter(
+          (p) => normalizeNumericId(p.team_id) === selectedTeamId,
+        );
+
+  const sorted = sortPlayersForFilter(scoped);
 
   return [
     { id: "all", label: "전체" },
-    ...scoped
-      .slice()
-      .sort((a, b) => a.player_name.localeCompare(b.player_name, "ko"))
-      .map((p) => ({ id: String(p.id), label: p.player_name })),
+    ...sorted.map((p) => ({ id: String(p.id), label: p.player_name })),
   ];
 }
 
@@ -133,7 +161,7 @@ export function isPlayerValidForTeamFilter(
   const teamId = parseFilterId(teamFilter);
   if (teamId === null) return true;
 
-  return player.team_id === teamId;
+  return normalizeNumericId(player.team_id) === teamId;
 }
 
 export function getFilterEmptyMessage(
@@ -157,22 +185,28 @@ export type RelatedPlayerBadge = {
 
 export function getRelatedPlayersForNews(
   newsId: number,
-  mentions: NewsPlayerMention[],
   maps: FeedMaps,
 ): RelatedPlayerBadge[] {
+  const normalizedNewsId = normalizeNumericId(newsId);
+  if (normalizedNewsId === null) return [];
+
+  const newsMentions = maps.mentionsByNewsId.get(normalizedNewsId) ?? [];
   const seen = new Set<number>();
   const badges: RelatedPlayerBadge[] = [];
 
-  for (const mention of mentions) {
-    if (mention.news_item_id !== newsId || seen.has(mention.player_id)) {
-      continue;
-    }
-    seen.add(mention.player_id);
-    const player = maps.playerById.get(mention.player_id);
+  for (const mention of newsMentions) {
+    const playerId = normalizeNumericId(mention.player_id);
+    if (playerId === null || seen.has(playerId)) continue;
+    seen.add(playerId);
+
+    const player = maps.playerById.get(playerId);
     if (!player) continue;
-    const team = maps.teamById.get(player.team_id);
+
+    const teamId = normalizeNumericId(player.team_id);
+    const team = teamId !== null ? maps.teamById.get(teamId) : undefined;
+
     badges.push({
-      playerId: player.id,
+      playerId,
       playerName: player.player_name,
       teamShortName: team?.short_name ?? "",
     });

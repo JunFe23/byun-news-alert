@@ -17,6 +17,7 @@ export interface FaTeam {
   team_name: string;
   short_name: string;
   match_keywords: string[] | null;
+  logo_path: string | null;
   created_at?: string;
 }
 
@@ -36,6 +37,7 @@ export interface FaPlayer {
   contract_status: ContractStatus | null;
   new_team_id: number | null;
   contract_note: string | null;
+  contract_amount: number | null;
   status_updated_at: string | null;
   created_at?: string;
 }

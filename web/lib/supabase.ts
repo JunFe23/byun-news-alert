@@ -44,7 +44,7 @@ export async function fetchFaTeams(): Promise<FaTeam[]> {
 
   const { data, error } = await supabase
     .from("fa_teams")
-    .select("id, team_name, short_name, match_keywords, created_at")
+    .select("id, team_name, short_name, match_keywords, logo_path, created_at")
     .order("id", { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -57,7 +57,7 @@ export async function fetchFaPlayers(): Promise<FaPlayer[]> {
   const { data, error } = await supabase
     .from("fa_players")
     .select(
-      "id, team_id, player_name, status, contract_status, new_team_id, contract_note, status_updated_at, created_at",
+      "id, team_id, player_name, status, contract_status, new_team_id, contract_note, contract_amount, status_updated_at, created_at",
     )
     .order("team_id", { ascending: true })
     .order("player_name", { ascending: true });

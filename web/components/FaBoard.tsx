@@ -1,8 +1,12 @@
+import FaBoardSummary from "@/components/FaBoardSummary";
 import FilterPills from "@/components/FilterPills";
+import TeamLabel from "@/components/TeamLabel";
 import { buildTeamFilterOptions } from "@/lib/feedFilters";
+import { buildStatusFilterOptions } from "@/lib/filterSort";
+import { formatContractAmount } from "@/lib/formatContractAmount";
+import { normalizeContractStatus } from "@/lib/faPlayerStatus";
+import { normalizeNumericId } from "@/lib/feedFilters";
 import type { FaPlayer, FaTeam } from "@/lib/types";
-
-const STATUS_ORDER = ["FA", "잔류", "이적", "계약미체결", "미정"] as const;
 
 export default function FaBoard({
   teams,
@@ -39,10 +43,16 @@ export default function FaBoard({
   const teamById = new Map(teams.map((t) => [t.id, t]));
 
   const filtered = players.filter((p) => {
-    if (teamFilter !== "all" && String(p.team_id) !== teamFilter) return false;
+    if (
+      teamFilter !== "all" &&
+      String(normalizeNumericId(p.team_id)) !== teamFilter
+    ) {
+      return false;
+    }
     if (statusFilter !== "all") {
-      const s = normalizeStatus(p.contract_status);
-      if (s !== statusFilter) return false;
+      const team = teamById.get(p.team_id);
+      const bucket = normalizeContractStatus(p.contract_status, team);
+      if (bucket !== statusFilter) return false;
     }
     return true;
   });
@@ -58,6 +68,13 @@ export default function FaBoard({
 
   return (
     <div className="space-y-6">
+      <FaBoardSummary
+        players={players}
+        teams={teams}
+        statusFilter={statusFilter}
+        onStatusFilterChange={onStatusFilterChange}
+      />
+
       <BoardFilters
         teams={teams}
         teamFilter={teamFilter}
@@ -71,11 +88,16 @@ export default function FaBoard({
         const teamPlayers = grouped.get(teamId) ?? [];
         return (
           <section key={teamId} className="space-y-3">
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-sm font-semibold tracking-tight text-[#222]">
-                {team?.team_name ?? `팀 #${teamId}`}
-              </h2>
-              <p className="text-[11px] text-brand-muted">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <TeamLabel team={team} size="md" strong />
+                {team?.team_name && team.team_name !== team.short_name ? (
+                  <span className="truncate text-[11px] text-brand-muted">
+                    {team.team_name}
+                  </span>
+                ) : null}
+              </div>
+              <p className="shrink-0 text-[11px] text-brand-muted">
                 {teamPlayers.length}명
               </p>
             </div>
@@ -114,10 +136,7 @@ function BoardFilters({
   onStatusFilterChange: (status: string) => void;
 }) {
   const teamOptions = buildTeamFilterOptions(teams);
-  const statusOptions = [
-    { id: "all", label: "전체" },
-    ...STATUS_ORDER.map((s) => ({ id: s, label: s })),
-  ];
+  const statusOptions = buildStatusFilterOptions();
 
   return (
     <div className="space-y-1">
@@ -150,48 +169,95 @@ function PlayerCard({
   newsCount: number;
   onSelect: () => void;
 }) {
-  const status = normalizeStatus(player.contract_status);
+  const status = normalizeContractStatus(player.contract_status, team);
+
   return (
     <article className="rounded-2xl border border-brand-border/80 bg-brand-surface shadow-card">
-      <div className="flex items-start justify-between gap-3 px-4 pb-3 pt-4">
-        <div className="min-w-0">
-          <p className="text-[15px] font-semibold tracking-tight text-[#1a1a1a]">
+      <div className="px-4 pb-3 pt-4">
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 text-[15px] font-semibold tracking-tight text-[#1a1a1a]">
             {player.player_name}
           </p>
-          <p className="mt-1 text-xs text-brand-muted">
-            원소속팀 {team?.short_name ?? "—"}
-            {newTeam ? ` → 새 팀 ${newTeam.short_name}` : ""}
-          </p>
+          <StatusBadge status={status} />
         </div>
-        <StatusBadge status={status} />
+        <TeamTransferInfo
+          originalTeam={team}
+          newTeam={newTeam}
+          contractStatus={status}
+        />
+        <div className="mt-2.5 flex items-baseline justify-between gap-2">
+          <span className="text-[10px] font-medium text-brand-muted">
+            계약금액
+          </span>
+          <span className="text-xs font-semibold tabular-nums text-[#222]">
+            {formatContractAmount(player.contract_amount)}
+          </span>
+        </div>
       </div>
 
-      {(player.contract_note || newsCount > 0) && (
-        <div className="border-t border-brand-border-subtle/70 px-4 py-3">
-          {player.contract_note ? (
-            <p className="text-xs leading-relaxed text-brand-muted">
-              {player.contract_note}
-            </p>
-          ) : null}
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <p className="text-[11px] text-brand-muted">
-              관련 뉴스{" "}
-              <span className="font-semibold text-brand-primary">
-                {newsCount}
-              </span>
-              건
-            </p>
-            <button
-              type="button"
-              onClick={onSelect}
-              className="text-[12px] font-semibold text-brand-primary underline-offset-4 hover:underline"
-            >
-              관련 뉴스 보기 →
-            </button>
-          </div>
+      <div className="border-t border-brand-border-subtle/70 px-4 py-3">
+        {player.contract_note ? (
+          <p className="text-xs leading-relaxed text-brand-muted">
+            {player.contract_note}
+          </p>
+        ) : null}
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 ${
+            player.contract_note ? "mt-2" : ""
+          }`}
+        >
+          <p className="text-[11px] text-brand-muted">
+            관련 뉴스{" "}
+            <span className="font-semibold text-brand-primary">{newsCount}</span>
+            건
+          </p>
+          <button
+            type="button"
+            onClick={onSelect}
+            className="shrink-0 text-[12px] font-semibold text-brand-primary underline-offset-4 hover:underline"
+          >
+            관련 뉴스 보기 →
+          </button>
         </div>
-      )}
+      </div>
     </article>
+  );
+}
+
+function TeamTransferInfo({
+  originalTeam,
+  newTeam,
+  contractStatus,
+}: {
+  originalTeam: FaTeam | undefined;
+  newTeam: FaTeam | null;
+  contractStatus: string;
+}) {
+  const newTeamFallback =
+    contractStatus === "FA" || contractStatus === "미정" ? "미정" : "-";
+
+  return (
+    <div className="mt-2 w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
+      <div className="inline-flex min-w-full flex-nowrap items-center gap-x-1.5 text-xs sm:gap-x-2">
+        <span className="shrink-0 text-[10px] font-medium text-brand-muted">
+          원소속
+        </span>
+        <TeamLabel team={originalTeam} size="sm" strong />
+        <span className="shrink-0 px-0.5 text-brand-muted" aria-hidden>
+          →
+        </span>
+        <span className="shrink-0 text-[10px] font-medium text-brand-muted">
+          새 팀
+        </span>
+        {newTeam ? (
+          <TeamLabel team={newTeam} size="sm" strong />
+        ) : (
+          <span className="shrink-0 whitespace-nowrap font-semibold text-[#1a1a1a]">
+            {newTeamFallback}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -199,10 +265,10 @@ function StatusBadge({ status }: { status: string }) {
   const classes =
     status === "잔류"
       ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-      : status === "이적"
-        ? "bg-amber-50 text-amber-800 border-amber-100"
+        : status === "이적"
+        ? "bg-sky-50 text-sky-800 border-sky-100"
         : status === "계약미체결"
-          ? "bg-gray-50 text-gray-700 border-gray-100"
+          ? "bg-orange-50 text-orange-800 border-orange-100"
           : status === "FA"
             ? "bg-brand-primary/[0.08] text-brand-primary border-brand-primary/15"
             : "bg-brand-cream text-brand-muted border-brand-border/60";
@@ -214,10 +280,5 @@ function StatusBadge({ status }: { status: string }) {
       {status}
     </span>
   );
-}
-
-function normalizeStatus(value: unknown): string {
-  if (typeof value !== "string" || value.trim() === "") return "미정";
-  return value;
 }
 

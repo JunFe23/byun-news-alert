@@ -100,8 +100,8 @@ export default function ClientHome() {
   }, [loadState, playerId, teamId, feedMaps.playerById, setParam]);
 
   const filteredNews = useMemo(
-    () => filterNewsByMentions(items, mentions, players, teamId, playerId),
-    [items, mentions, players, teamId, playerId],
+    () => filterNewsByMentions(items, feedMaps, teamId, playerId),
+    [items, feedMaps, teamId, playerId],
   );
 
   const newsCountByPlayerId = useMemo(() => {
@@ -123,9 +123,26 @@ export default function ClientHome() {
   const hasFilteredResults = loadState === "success" && filteredNews.length > 0;
   const filterActive = teamId !== "all" || playerId !== "all";
 
+  const applySearchParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      const next = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === null || value === "all" || value === "") {
+          next.delete(key);
+        } else {
+          next.set(key, value);
+        }
+      }
+      router.replace(`/?${next.toString()}`);
+    },
+    [router, searchParams],
+  );
+
   const handleTeamFilterChange = (id: string) => {
-    setParam("team", id);
-    setParam("player", "all");
+    applySearchParams({
+      team: id === "all" ? null : id,
+      player: null,
+    });
   };
 
   return (
@@ -183,7 +200,6 @@ export default function ClientHome() {
                       isLatest={index === 0 && !filterActive}
                       relatedPlayers={getRelatedPlayersForNews(
                         item.id,
-                        mentions,
                         feedMaps,
                       )}
                     />

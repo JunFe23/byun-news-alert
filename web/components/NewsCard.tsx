@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatKstDateTime } from "@/lib/formatDate";
+import { formatKstDateTime, formatKstShort } from "@/lib/formatDate";
 import type { LinkPreview } from "@/lib/linkPreview";
 import type { RelatedPlayerBadge } from "@/lib/feedFilters";
 import type { NewsItem } from "@/lib/types";
@@ -163,13 +163,26 @@ function CardMetaLine({
   detectedAt: string;
 }) {
   return (
-    <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-brand-muted">
-      <span className="font-medium text-[#333]">{publisher}</span>
-      <span className="mx-1.5 text-brand-border">·</span>
-      <span>발행 {formatKstDateTime(pubDate)}</span>
-      <span className="mx-1.5 text-brand-border">·</span>
-      <span>감지 {formatKstDateTime(detectedAt)}</span>
-    </p>
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-[11px] font-medium text-[#333]">{publisher}</p>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-muted">
+        <span className="inline-flex shrink-0 items-center whitespace-nowrap sm:hidden">
+          발행 {formatKstShort(pubDate)}
+        </span>
+        <span className="inline-flex shrink-0 items-center whitespace-nowrap sm:hidden">
+          감지 {formatKstShort(detectedAt)}
+        </span>
+        <span className="hidden whitespace-nowrap sm:inline">
+          발행 {formatKstDateTime(pubDate)}
+        </span>
+        <span className="hidden text-brand-border sm:inline" aria-hidden>
+          ·
+        </span>
+        <span className="hidden whitespace-nowrap sm:inline">
+          감지 {formatKstDateTime(detectedAt)}
+        </span>
+      </div>
+    </div>
   );
 }
 

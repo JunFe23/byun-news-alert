@@ -38,6 +38,26 @@ export function formatKstCompact(value: string | null | undefined): string {
   return `${get("year")}.${get("month")}.${get("day")} ${get("hour")}:${get("minute")}`;
 }
 
+/** 모바일 카드 메타 — 05.20 14:30 */
+export function formatKstShort(value: string | null | undefined): string {
+  const date = parseDate(value);
+  if (!date) return "—";
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: KST,
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+
+  return `${get("month")}.${get("day")} ${get("hour")}:${get("minute")}`;
+}
+
 function parseDate(value: string | null | undefined): Date | null {
   if (!value) return null;
   const date = new Date(value);
