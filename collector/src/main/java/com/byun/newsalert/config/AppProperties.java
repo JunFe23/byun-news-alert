@@ -21,6 +21,12 @@ public class AppProperties {
     public static class Naver {
         private String clientId;
         private String clientSecret;
+        /** API 호출 전·후 대기(ms) */
+        private long requestDelayMs = 500;
+        /** 429 발생 시 최대 재시도 횟수 */
+        private int maxRetries = 3;
+        /** 429 재시도 시 선형 backoff 기준(ms): 1회=×1, 2회=×2, 3회=×3 */
+        private long retryBackoffMs = 3000;
     }
 
     @Getter

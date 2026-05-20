@@ -1,161 +1,298 @@
 # byun-news-alert
 
-국내 프로농구 FA **변준형** 관련 뉴스를 자동 수집하고, 신규 기사가 있으면 Telegram으로 알려주는 프로젝트입니다.
+2026 KBL **FA 시장** 관련 뉴스를 자동 수집하고, 신규 기사가 있으면 Telegram으로 알려주는 프로젝트입니다.
 
-현재 단계에서는 **collector**(Spring Boot 배치)와 **GitHub Actions** 스케줄만 구현되어 있습니다.  
-`web/`(Next.js 대시보드)는 별도 단계에서 추가할 예정입니다.
+- **collector** — Spring Boot 배치 (네이버 뉴스 API → Supabase → Telegram)
+- **web** — Next.js 공개 피드 (별도 디렉토리)
+- **GitHub Actions** — watch 모드 5분 주기 실행
 
 ## 프로젝트 개요
 
-1. GitHub Actions가 5분마다 `collector`를 실행합니다.
-2. collector는 네이버 뉴스 검색 API에서 `변준형` 관련 기사를 조회합니다.
-3. 제목·설명에 `변준형`과 FA/이적 등 키워드가 포함된 기사만 선별합니다.
-4. Supabase Postgres `news_items` 테이블에 저장합니다 (`link` 기준 중복 방지).
-5. **신규** 저장된 기사만 Telegram으로 알립니다.
-6. 작업이 끝나면 프로세스가 종료됩니다 (상시 API 서버 아님).
+1. GitHub Actions가 주기적으로 collector를 **watch** 모드로 실행합니다.
+2. collector는 `fa_players`에 등록된 선수 기준으로 기사 관련성을 판단합니다.
+3. `APP_NEWS_FROM_DATE`(기본 `2026-05-18`) 이후 기사만 저장합니다.
+4. `news_items`에 저장하고, `news_player_mentions`에 선수–기사 관계를 기록합니다.
+5. **watch** 모드에서 신규 기사 중 **알림 대상 선수**(기본: 변준형)가 포함된 경우에만 Telegram 알림을 보냅니다.
+6. **backfill** 모드는 초기 데이터 적재용이며 Telegram 알림을 보내지 않습니다.
+7. **web**에는 KBL FA 전체 선수 뉴스가 표시되며, Telegram은 별도 정책입니다.
 
 ## 아키텍처
 
 ```mermaid
 flowchart LR
-  GHA[GitHub Actions<br/>5분 cron] --> COL[collector<br/>Spring Boot CLI]
+  GHA[GitHub Actions] --> COL[collector]
   COL --> NAVER[네이버 뉴스 API]
-  COL --> DB[(Supabase Postgres<br/>news_items)]
-  COL --> TG[Telegram Bot API]
+  COL --> DB[(Supabase)]
+  COL --> TG[Telegram]
+  WEB[web Next.js] --> DB
 ```
 
-| 구성요소 | 역할 |
-|---------|------|
-| GitHub Actions | 스케줄 실행, Secrets 주입 |
-| collector | 수집·필터·저장·알림 (1회 실행 후 종료) |
-| Supabase Postgres | 뉴스 영구 저장 |
-| Telegram | 신규 뉴스 푸시 알림 |
+## Supabase 테이블
 
-## Supabase 테이블 구조
+### news_items (기존)
 
-**테이블명:** `news_items`
+| 컬럼 | 설명 |
+|------|------|
+| id | PK |
+| title, description, link (UNIQUE) | 기사 정보 |
+| pub_date, detected_at | 발행·감지 시각 |
+| matched_keywords | 매칭된 선수명·팀 short_name·공통 키워드 |
+| is_alert_sent | Telegram 발송 여부 |
 
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | BIGSERIAL PK | 자동 증가 ID |
-| title | TEXT NOT NULL | 기사 제목 |
-| description | TEXT | 기사 요약 |
-| link | TEXT NOT NULL UNIQUE | 네이버 뉴스 링크 (중복 방지 키) |
-| original_link | TEXT | 원문 링크 |
-| publisher | TEXT | 출처(호스트명 등) |
-| pub_date | TIMESTAMPTZ | 기사 발행 시각 |
-| detected_at | TIMESTAMPTZ | 수집 감지 시각 (기본 NOW) |
-| matched_keywords | TEXT[] | 매칭된 키워드 목록 |
-| is_alert_sent | BOOLEAN | Telegram 발송 여부 |
-| created_at | TIMESTAMPTZ | 레코드 생성 시각 |
+### fa_teams
 
-## 필요한 환경변수
+| 컬럼 | 설명 |
+|------|------|
+| team_name, short_name | 팀 이름·짧은 이름 |
+| match_keywords (TEXT[]) | 팀 식별 키워드 (구단명·브랜드명) |
+
+### fa_players
+
+| 컬럼 | 설명 |
+|------|------|
+| team_id | FK → fa_teams |
+| player_name | 선수명 |
+| status | 상태 (예: fa) |
+
+### news_player_mentions
+
+| 컬럼 | 설명 |
+|------|------|
+| news_item_id, player_id | UNIQUE 쌍 |
+| created_at | 생성 시각 |
+
+## FA 팀/선수 seed
+
+파일: [`sql/fa_seed.sql`](sql/fa_seed.sql)
+
+Supabase SQL Editor에서 실행합니다. 팀·선수 예시가 들어 있으며, **실제 2026 FA 대상 선수는 Supabase에서 직접 갱신**하세요.
+
+## collector 모드
+
+| 환경변수 | 기본값 | 설명 |
+|----------|--------|------|
+| `APP_NEWS_MODE` | `watch` | `watch` 또는 `backfill` |
+| `APP_NEWS_FROM_DATE` | `2026-05-18` | 이 날짜(KST 00:00) 이후 기사만 처리 |
+
+### watch 모드
+
+- GitHub Actions 기본 모드
+- 검색어 (`application.yml` 기본값):  
+  `KBL FA`, `프로농구 FA`, `KBL 자유계약`, `프로농구 자유계약선수`, `변준형 프로농구`, `변준형 KBL`, `정관장 프로농구`
+- 검색당 `display=20`, `sort=date`
+- 관련성 통과 + `fromDate` 이후만 저장
+- **신규** `link` 저장 후, 매칭 선수 중 **알림 대상 선수**가 있을 때만 Telegram 알림
+- 변준형이 아닌 FA 뉴스도 `news_items`·`news_player_mentions`에는 저장 (`is_alert_sent=false`)
+- 이미 있는 `link`는 저장·알림 스킵, 없는 `news_player_mentions`만 추가
+
+### backfill 모드
+
+- `fa_players` 전체 선수에 대해 검색
+- 검색어 (선수별): `{선수명} 프로농구`, `{선수명} KBL`, `{선수명} 농구`, `{선수명} {short_name} 프로농구`  
+  (`{선수명} FA` 단독 검색은 사용하지 않음 — 야구 FA 오탐 방지)
+- `display=100`, `start=1,101,201…`
+- `pubDate`가 `fromDate` 이전이면 **해당 선수·해당 검색어** 페이지네이션 중단
+- Telegram 알림 **없음**
+- `news_player_mentions`는 반드시 저장
+
+## 수집 정책 (오탐 방지)
+
+### 1. URL 허용 (필수)
+
+본 서비스는 **네이버 스포츠 농구 카테고리 기사만** `news_items`에 저장합니다.
+
+- `link`와 `originalLink`를 모두 검사하며, **둘 중 하나라도** 아래 조건을 만족하면 URL 필터를 통과합니다.
+- 허용 host: `m.sports.naver.com`, `sports.naver.com`, `sports.news.naver.com`
+- 허용 path: `/basketball/` 포함
+
+허용 예:
+
+- `https://m.sports.naver.com/basketball/article/076/0004407512`
+
+제외 예:
+
+- 일반 언론사 (`kihoilbo.co.kr`, `smarttoday.co.kr` 등)
+- 네이버 스포츠 다른 종목 (`/esports/`, `/baseball/`, `/kbaseball/`, `/football/` 등)
+
+### 2. 텍스트 관련성 (URL 통과 후 추가 적용)
+
+URL이 허용되어도 **선수명·농구 문맥·팀 문맥** 필터를 추가로 통과해야 저장됩니다.
+
+### 처리 순서
+
+1. title/description HTML 제거  
+2. URL이 네이버 스포츠 농구인지 확인 → 아니면 즉시 스킵  
+3. `pubDate` 기준 (`fromDate` 이후만)  
+4. 바이라인 제거 후 선수명·농구 문맥·팀 문맥 검사  
+5. 매칭 선수 1명 이상일 때만 `news_items` / `news_player_mentions` 저장  
+
+### 수집 로그 (스킵 사유별)
+
+`URL제외` · `농구문맥없음` · `직함/기자제외` · `선수0` · `저장대상` 건수를 구분해 출력합니다.
+
+## 관련성 판단 (텍스트)
+
+`rawText = title + description` → 기자 바이라인 제거 후 `text`로 판단합니다.
+
+```
+isRelevantToPlayer =
+  hasPlayerMention (실제 선수 언급)
+  AND NOT hasExcludedContext (또는 강한 농구 문맥이 있으면 제외 키워드 무시)
+  AND (hasStrongBasketballContext OR hasSpecificBasketballTeamContext)
+```
+
+### 저장 정책
+
+- **매칭 선수 0명이면 `news_items`에 저장하지 않습니다.**
+- **농구 문맥이 없으면** 선수명·FA가 있어도 저장하지 않습니다.
+- `LG` / `SK` / `DB` / `KT` / `삼성` / `KCC` / `소노` / `FA` / `계약` / `구단` / `영입` / `이적` / `잔류`는 **단독으로는 팀·농구 식별에 사용하지 않습니다.**  
+  강한 농구 문맥이 있을 때만 `matched_keywords` 보조 수집에 씁니다.
+- **`{선수명} 기자/특파원/본부장/사장/대표/연구원` 등** 직함·기자 패턴은 선수 언급으로 보지 않습니다.
+
+### 강한 농구 문맥
+
+KBL, 프로농구, 남자농구, 농구, 농구 FA, KBL FA, KBL 자유계약, 프로농구 FA, 자유계약선수 명단, 보수 총액, 샐러리캡 등
+
+### 명확한 농구팀 식별 (기업명·지역명 혼동 적은 키워드)
+
+정관장, 레드부스터스, 프로미, 세이커스, 썬더스, 스카이거너스, 나이츠, 이지스, 소닉붐, 페가수스, 현대모비스, 모비스, 피버스, 한국가스공사, 가스공사
+
+### 제외 문맥
+
+| 구분 | 예시 키워드 |
+|------|-------------|
+| 야구 | KBO, 투수, NC 다이노스, KT 위즈, LG 트윈스, 홈런, … |
+| 금융/기업 | ETF, 코스피, 삼성전자, LG전자, 현대차, 본부장, 네이버, … |
+
+**제외 규칙:** `hasExcludedContext`이고 **강한 농구 문맥이 없으면** 무조건 스킵합니다.  
+예: `박민우` + `NC 다이노스` / `KT 위즈` → 야구 기사 제외  
+예: `박민우` + `현대차`·`기아` + `본부장` → 경제/기업 기사 제외
+
+## 환경변수
 
 | 변수 | 용도 |
 |------|------|
-| `NAVER_CLIENT_ID` | 네이버 검색 API Client ID |
-| `NAVER_CLIENT_SECRET` | 네이버 검색 API Client Secret |
-| `SUPABASE_DB_URL` | Supabase Postgres JDBC URL |
-| `SUPABASE_DB_USERNAME` | DB 사용자명 |
-| `SUPABASE_DB_PASSWORD` | DB 비밀번호 |
-| `TELEGRAM_BOT_TOKEN` | Telegram Bot Token |
-| `TELEGRAM_CHAT_ID` | 알림 수신 채팅 ID |
+| `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 네이버 검색 API |
+| `SUPABASE_DB_URL` / `USERNAME` / `PASSWORD` | Postgres JDBC |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram (watch + 알림 대상 선수일 때만) |
+| `TELEGRAM_ALERT_PLAYER_NAMES` | Telegram 알림 대상 선수 (쉼표 구분, 기본 `변준형`) |
+| `APP_NEWS_MODE` | `watch` / `backfill` |
+| `APP_NEWS_FROM_DATE` | 수집 시작일 (예: `2026-05-18`) |
+| `APP_NAVER_REQUEST_DELAY_MS` | API 호출 전·후 대기(ms), 기본 `500` |
+| `APP_NAVER_MAX_RETRIES` | 429 재시도 횟수, 기본 `3` |
+| `APP_NAVER_RETRY_BACKOFF_MS` | 429 재시도 backoff 기준(ms), 기본 `3000` |
 
-민감 정보는 코드에 넣지 마세요. 로컬에서는 셸 환경변수로만 주입합니다.
+### Telegram 알림 정책
 
-## collector 로컬 실행 방법
+| 구분 | 동작 |
+|------|------|
+| **web 사이트** | `fa_players` 기준 **전체 FA 뉴스** 표시 |
+| **Telegram (watch)** | 신규 저장 기사 중 **알림 대상 선수**가 매칭된 경우만 발송 (기본: **변준형**) |
+| **Telegram (backfill)** | 발송하지 않음 |
+| **is_alert_sent** | 실제 Telegram 발송 성공 시에만 `true` |
 
-### 사전 준비
+알림 대상 선수 확장:
 
-- Java 21
-- Supabase에 `news_items` 테이블 생성 완료
-- [네이버 개발자 센터](https://developers.naver.com/)에서 검색 API 앱 등록
-- Telegram Bot 생성 및 `chat_id` 확인
+- 환경변수: `TELEGRAM_ALERT_PLAYER_NAMES=변준형,전성현`
+- 또는 `application.yml`: `app.telegram.alert-player-names`
 
-### 실행
+```yaml
+app:
+  telegram:
+    alert-player-names: ${TELEGRAM_ALERT_PLAYER_NAMES:변준형}
+```
+
+## watch 실행 (로컬)
 
 ```bash
 cd collector
 
-export NAVER_CLIENT_ID="your-naver-client-id"
-export NAVER_CLIENT_SECRET="your-naver-client-secret"
+export APP_NEWS_MODE=watch
+export APP_NEWS_FROM_DATE=2026-05-18
+export NAVER_CLIENT_ID="..."
+export NAVER_CLIENT_SECRET="..."
 export SUPABASE_DB_URL="jdbc:postgresql://db.xxxx.supabase.co:5432/postgres?sslmode=require"
 export SUPABASE_DB_USERNAME="postgres"
-export SUPABASE_DB_PASSWORD="your-db-password"
-export TELEGRAM_BOT_TOKEN="your-bot-token"
-export TELEGRAM_CHAT_ID="your-chat-id"
+export SUPABASE_DB_PASSWORD="..."
+export TELEGRAM_BOT_TOKEN="..."
+export TELEGRAM_CHAT_ID="..."
 
-chmod +x ./gradlew
 ./gradlew bootRun --no-daemon
 ```
 
-빌드만 확인할 때:
+## backfill 실행 (로컬)
 
 ```bash
 cd collector
-./gradlew build --no-daemon
+
+export APP_NEWS_MODE=backfill
+export APP_NEWS_FROM_DATE=2026-05-18
+# (네이버·Supabase 환경변수 동일, Telegram은 불필요하지만 설정돼 있어도 발송하지 않음)
+
+./gradlew bootRun --no-daemon
 ```
 
-### 로컬 테스트 순서
+**주의:** backfill은 선수·검색어·페이지 수가 많아 API 호출이 길어질 수 있습니다.
 
-1. **빌드 확인** — `./gradlew build --no-daemon` 성공 여부 확인
-2. **환경변수 설정** — 위 7개 변수를 export
-3. **1회 수집 실행** — `./gradlew bootRun --no-daemon`
-4. **로그 확인** — 콘솔에서 아래 항목 확인
-   - `뉴스 수집 시작`
-   - `네이버 API 조회 결과 개수`
-   - `관련 뉴스 개수`
-   - `신규 저장 개수`
-   - `알림 발송 개수`
-5. **DB 확인** — Supabase Table Editor에서 `news_items` 신규 행 확인
-6. **중복 실행** — 같은 명령을 다시 실행해 신규 저장·알림이 0인지 확인 (이미 있는 `link`는 스킵)
-7. **Telegram** — 신규 기사가 있을 때만 메시지 수신 확인
+### API 속도 제한 보호 (watch / backfill 공통)
 
-### 관련 뉴스 판단 규칙
+네이버 검색 API 초당 호출 제한(429)을 피하기 위해 collector에 딜레이·재시도가 적용됩니다.
 
-- 제목 또는 설명에 **변준형** 포함 필수
-- 아래 키워드 중 **1개 이상** 포함:  
-  `FA`, `계약`, `이적`, `잔류`, `영입`, `협상`, `정관장`, `KCC`, `DB`, `LG`, `SK`, `삼성`, `현대모비스`, `KT`, `소노`, `가스공사`
-- HTML 태그·entity는 Jsoup으로 제거 후 매칭
+| 환경변수 | 기본값 | 설명 |
+|----------|--------|------|
+| `APP_NAVER_REQUEST_DELAY_MS` | `500` | API 호출 **전·후** 대기(ms). backfill은 `800` 이상 권장 |
+| `APP_NAVER_MAX_RETRIES` | `3` | 429 발생 시 최대 재시도 횟수 |
+| `APP_NAVER_RETRY_BACKOFF_MS` | `3000` | 재시도 대기 기준(ms). 1회=3초, 2회=6초, 3회=9초 (선형 backoff) |
 
-## GitHub Secrets 등록 목록
+- **429**가 계속되면 해당 `query`/`start`(backfill) 또는 `query`(watch)만 스킵하고 다음으로 진행합니다. 전체 backfill은 중단하지 않습니다.
+- **401 / 403** 인증 오류는 치명적 오류로 처리해 실행을 중단합니다.
 
-Repository → **Settings** → **Secrets and variables** → **Actions**에서 등록:
+```bash
+APP_NEWS_MODE=backfill \
+APP_NAVER_REQUEST_DELAY_MS=800 \
+APP_NAVER_MAX_RETRIES=3 \
+./gradlew bootRun --no-daemon
+```
 
-| Secret 이름 |
-|-------------|
-| `NAVER_CLIENT_ID` |
-| `NAVER_CLIENT_SECRET` |
-| `SUPABASE_DB_URL` |
-| `SUPABASE_DB_USERNAME` |
-| `SUPABASE_DB_PASSWORD` |
-| `TELEGRAM_BOT_TOKEN` |
-| `TELEGRAM_CHAT_ID` |
+최종 로그에 `naverAPI호출`, `429재시도`, `429스킵` 건수가 포함됩니다.
 
-`SUPABASE_DB_URL`은 JDBC 형식이어야 합니다. 예:
+## GitHub Actions
 
-`jdbc:postgresql://db.<project-ref>.supabase.co:5432/postgres?sslmode=require`
+워크플로: `.github/workflows/collect-news.yml`
 
-## GitHub Actions 수동 실행 방법
+- 스케줄: 5분 간격 (분 단위 cron)
+- `APP_NEWS_MODE=watch`, `APP_NEWS_FROM_DATE=2026-05-18` 명시
+- `workflow_dispatch` 수동 실행 가능
 
-1. GitHub 저장소 → **Actions** 탭
-2. 왼쪽에서 **Collect Byun News** 워크플로 선택
-3. **Run workflow** → 브랜치 선택 → **Run workflow**
-4. 실행 로그에서 collector 단계 성공 여부 확인
+Secrets: `NAVER_*`, `SUPABASE_*`, `TELEGRAM_*` (기존과 동일)
 
-스케줄: `*/5 * * * *` (5분마다, UTC 기준)
+### 기존 Actions 동작 영향
+
+- 스케줄·수동 실행 방식은 동일합니다.
+- **수집 범위**가 변준형 단일 키워드 → FA 전체 선수 + watch 검색어 세트로 확장되었습니다.
+- Telegram은 **알림 대상 선수**(기본 변준형) 관련 신규 기사만 발송합니다.
+- Telegram 메시지에 **관련 선수**·매칭 키워드가 포함됩니다.
+- DB에 `fa_teams`, `fa_players`, `news_player_mentions` 데이터가 있어야 합니다.
+
+## web
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+자세한 내용은 [`web/README.md`](web/README.md)를 참고하세요.
 
 ## 프로젝트 구조
 
 ```
 byun-news-alert/
-├── collector/                 # Spring Boot 배치 (Java 21)
-│   └── src/main/java/com/byun/newsalert/
+├── collector/
+├── web/
+├── sql/
+│   └── fa_seed.sql
 ├── .github/workflows/
 │   └── collect-news.yml
 └── README.md
 ```
-
-## 이후 계획
-
-- `web/` — Next.js 기반 뉴스 목록·필터 UI (별도 단계에서 구현 예정)

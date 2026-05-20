@@ -39,6 +39,12 @@ create policy "Allow public read on news_items"
 
 Supabase Dashboard → **Authentication** → **Policies** 또는 SQL Editor에서 설정하세요.
 
+FA 확장 기능(팀/선수/멘션)을 사용하려면 아래 테이블에도 **SELECT** 정책이 필요합니다.
+
+- `fa_teams`
+- `fa_players`
+- `news_player_mentions`
+
 ## 로컬 실행
 
 ```bash
@@ -92,3 +98,20 @@ Framework Preset은 Next.js가 자동 감지됩니다. Build Command: `npm run b
 - 로딩 / 빈 목록 / 오류 상태 처리
 - 상단 sticky 헤더, 새로고침, 마지막 업데이트 시각 표시
 - 카드 상단에 OG 이미지 미리보기 (16:9, `object-cover`)
+
+## 뉴스 피드 필터
+
+- 상단 탭에서 **뉴스 피드 / FA 현황판** 전환
+- 뉴스 피드에서 **팀별 / 선수별** 필터 제공 (모바일 가로 스크롤 pill)
+- 필터링은 `news_player_mentions` 관계를 기반으로 동작합니다.
+- 기본값은 전체, 선택 시 해당 팀/선수와 연결된 뉴스만 표시됩니다.
+
+## FA 현황판
+
+- 팀별로 선수 목록을 보여주고, **상태/팀 필터**를 제공합니다.
+- 선수 카드에 **원소속팀, 계약상태, 새 팀, 메모, 관련 뉴스 수**를 표시합니다.
+- 선수 카드의 **관련 뉴스 보기**를 누르면 뉴스 피드로 이동하며 해당 선수 필터가 적용됩니다.
+
+### 계약상태 관리
+
+`fa_players.contract_status`, `new_team_id`, `contract_note`, `status_updated_at` 등은\n+**DB에서 수동 관리**하는 값입니다. (관리 UI는 별도 구현 예정)

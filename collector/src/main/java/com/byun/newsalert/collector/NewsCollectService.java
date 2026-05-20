@@ -32,7 +32,15 @@ public class NewsCollectService {
 
     public void collectOnce() {
         String mode = appProperties.getNews().getMode();
-        log.info("뉴스 수집 시작: mode={}, fromDate={}", mode, appProperties.getNews().getFromDate());
+        AppProperties.Naver naver = appProperties.getNaver();
+        log.info(
+                "뉴스 수집 시작: mode={}, fromDate={}, naverDelayMs={}, naverMaxRetries={}, naverRetryBackoffMs={}",
+                mode,
+                appProperties.getNews().getFromDate(),
+                naver.getRequestDelayMs(),
+                naver.getMaxRetries(),
+                naver.getRetryBackoffMs()
+        );
 
         if ("backfill".equalsIgnoreCase(mode)) {
             collectBackfill();
@@ -55,11 +63,17 @@ public class NewsCollectService {
         int display = appProperties.getNews().getWatch().getDisplay();
 
         CollectStats stats = new CollectStats();
+        NaverApiCallStats naverStats = stats.naverStats;
         Set<String> processedLinks = new HashSet<>();
 
         for (String query : queries) {
             log.info("watch 검색: query={}", query);
-            NaverNewsResponse response = naverNewsClient.searchNews(query, display, 1);
+            NaverSearchResult searchResult = naverNewsClient.searchNews(query, display, 1, naverStats);
+            if (searchResult.skippedDueToRateLimit()) {
+                log.warn("watch 검색 스킵 (429): query={}", query);
+                continue;
+            }
+            NaverNewsResponse response = searchResult.response().orElseThrow();
             List<NaverNewsItem> items = itemsOrEmpty(response);
             stats.fetched += items.size();
             log.info("네이버 API 조회 결과: query={}, count={}", query, items.size());
@@ -83,6 +97,7 @@ public class NewsCollectService {
         int display = appProperties.getNews().getBackfill().getDisplay();
 
         CollectStats stats = new CollectStats();
+        NaverApiCallStats naverStats = stats.naverStats;
         Set<String> processedLinks = new HashSet<>();
 
         for (FaPlayer player : players) {
@@ -93,9 +108,10 @@ public class NewsCollectService {
             }
 
             List<String> queries = List.of(
-                    player.getPlayerName() + " FA",
-                    player.getPlayerName() + " " + team.getShortName(),
-                    player.getPlayerName() + " 프로농구"
+                    player.getPlayerName() + " 프로농구",
+                    player.getPlayerName() + " KBL",
+                    player.getPlayerName() + " 농구",
+                    player.getPlayerName() + " " + team.getShortName() + " 프로농구"
             );
 
             for (String query : queries) {
@@ -104,7 +120,18 @@ public class NewsCollectService {
                 boolean stopQuery = false;
 
                 while (!stopQuery && start <= NAVER_MAX_START) {
-                    NaverNewsResponse response = naverNewsClient.searchNews(query, display, start);
+                    NaverSearchResult searchResult =
+                            naverNewsClient.searchNews(query, display, start, naverStats);
+                    if (searchResult.skippedDueToRateLimit()) {
+                        log.warn(
+                                "backfill 검색 스킵 (429): player={}, query={}, start={}",
+                                player.getPlayerName(),
+                                query,
+                                start
+                        );
+                        break;
+                    }
+                    NaverNewsResponse response = searchResult.response().orElseThrow();
                     List<NaverNewsItem> items = itemsOrEmpty(response);
                     if (items.isEmpty()) {
                         break;
@@ -116,13 +143,17 @@ public class NewsCollectService {
 
                     for (NaverNewsItem item : items) {
                         NewsTextUtils.ParsedArticle parsed = NewsTextUtils.parseArticle(item);
+                        if (!NaverSportsBasketballUrlFilter.isAllowedArticle(parsed)) {
+                            stats.skippedUrl++;
+                            continue;
+                        }
                         if (parsed.pubDate() != null && parsed.pubDate().isBefore(fromDate)) {
                             stopQuery = true;
                             log.info("fromDate 이전 기사 도달, 검색 중단: player={}, query={}, pubDate={}",
                                     player.getPlayerName(), query, parsed.pubDate());
                             break;
                         }
-                        processItem(item, players, fromDate, "backfill", processedLinks, stats);
+                        processParsed(parsed, players, "backfill", processedLinks, stats);
                     }
 
                     if (stopQuery || items.size() < display) {
@@ -146,31 +177,63 @@ public class NewsCollectService {
     ) {
         NewsTextUtils.ParsedArticle parsed = NewsTextUtils.parseArticle(item);
         if (parsed.link() == null || parsed.link().isBlank()) {
+            stats.skippedInvalid++;
             return;
         }
-
+        if (!NaverSportsBasketballUrlFilter.isAllowedArticle(parsed)) {
+            stats.skippedUrl++;
+            return;
+        }
         if (parsed.pubDate() == null || parsed.pubDate().isBefore(fromDate)) {
+            stats.skippedOld++;
+            return;
+        }
+        processParsed(parsed, players, mode, processedLinks, stats);
+    }
+
+    private void processParsed(
+            NewsTextUtils.ParsedArticle parsed,
+            List<FaPlayer> players,
+            String mode,
+            Set<String> processedLinks,
+            CollectStats stats
+    ) {
+        PlayerRelevanceService.MatchResult match =
+                playerRelevanceService.matchPlayers(parsed.title(), parsed.description(), players);
+
+        if (!match.hasMatches()) {
+            switch (match.skipReason()) {
+                case BASEBALL_CONTEXT, FINANCE_CORPORATE_CONTEXT, NO_BASKETBALL_CONTEXT ->
+                        stats.skippedNoBasketball++;
+                case NON_PLAYER_ROLE_PATTERN -> stats.skippedRolePattern++;
+                case NO_PLAYER_MATCH -> {
+                    stats.skippedNoPlayer++;
+                    if (stats.skippedNoPlayer <= 20) {
+                        log.debug("매칭 선수 0명으로 스킵: title={}", parsed.title());
+                    }
+                }
+                default -> stats.skippedNoPlayer++;
+            }
             return;
         }
 
-        String text = NewsTextUtils.buildText(parsed.title(), parsed.description());
-        List<FaPlayer> matchedPlayers = playerRelevanceService.findMatchingPlayers(text, players);
-        if (matchedPlayers.isEmpty()) {
-            return;
-        }
+        List<FaPlayer> matchedPlayers = match.matchedPlayers();
 
         stats.relevant++;
 
         if (processedLinks.contains(parsed.link())) {
             NewsPersistenceService.SaveResult result =
                     newsPersistenceService.persist(parsed, matchedPlayers,
-                            playerRelevanceService.collectMatchedKeywords(text, matchedPlayers),
+                            playerRelevanceService.collectMatchedKeywords(match.cleanedText(), matchedPlayers),
                             mode);
             stats.mentionsAdded += result.mentionsAdded();
+            if (result.mentionsAdded() > 0) {
+                stats.existingLinked++;
+            }
             return;
         }
 
-        List<String> keywords = playerRelevanceService.collectMatchedKeywords(text, matchedPlayers);
+        List<String> keywords = playerRelevanceService.collectMatchedKeywords(match.cleanedText(), matchedPlayers);
         NewsPersistenceService.SaveResult result =
                 newsPersistenceService.persist(parsed, matchedPlayers, keywords, mode);
 
@@ -200,15 +263,39 @@ public class NewsCollectService {
     }
 
     private void logStats(String mode, CollectStats stats) {
-        log.info("[{}] API 조회 {}건, 관련 {}건, 신규 저장 {}건, 알림 {}건, 멘션 추가 {}건",
-                mode, stats.fetched, stats.relevant, stats.saved, stats.alerted, stats.mentionsAdded);
+        NaverApiCallStats naver = stats.naverStats;
+        log.info(
+                "[{}] naverAPI호출 {} | 429재시도 {} | 429스킵 {} | 뉴스 {}건 | fromDate제외 {} | URL제외 {} | 농구문맥없음 {} | 직함/기자제외 {} | 선수0 {} | 저장대상 {} | 신규저장 {} | 멘션+{} | 알림 {}",
+                mode,
+                naver.getApiCallCount(),
+                naver.getRateLimitRetryCount(),
+                naver.getRateLimitSkipCount(),
+                stats.fetched,
+                stats.skippedOld,
+                stats.skippedUrl,
+                stats.skippedNoBasketball,
+                stats.skippedRolePattern,
+                stats.skippedNoPlayer,
+                stats.relevant,
+                stats.saved,
+                stats.mentionsAdded,
+                stats.alerted
+        );
     }
 
     private static class CollectStats {
+        final NaverApiCallStats naverStats = new NaverApiCallStats();
         int fetched;
         int relevant;
         int saved;
         int alerted;
         int mentionsAdded;
+        int skippedOld;
+        int skippedNoPlayer;
+        int skippedInvalid;
+        int existingLinked;
+        int skippedUrl;
+        int skippedRolePattern;
+        int skippedNoBasketball;
     }
 }
