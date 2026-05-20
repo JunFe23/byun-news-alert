@@ -15,14 +15,18 @@
 |------|------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 Measurement ID (예: `G-XXXXXXXXXX`, 선택) |
 
 **주의:** service role key, DB password, Telegram token, Naver secret은 이 앱에 넣지 마세요.
 
 로컬에서는 `web/.env.local` 파일로 설정합니다 (git에 커밋하지 않음).
 
+예시는 [`web/.env.example`](.env.example)를 참고하세요.
+
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 ```
 
 ## Supabase RLS
@@ -87,8 +91,21 @@ npm start
 
 1. [Vercel](https://vercel.com)에서 이 저장소를 Import 합니다.
 2. **Root Directory**를 `web`으로 설정합니다.
-3. **Environment Variables**에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`를 추가합니다.
+3. **Environment Variables**에 아래를 추가합니다.
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_GA_MEASUREMENT_ID` (GA4 유입 분석, 선택)
 4. Deploy 후 발급된 URL을 공유합니다.
+
+### GA4 (Vercel)
+
+1. [Google Analytics](https://analytics.google.com)에서 웹 데이터 스트림을 만들고 **Measurement ID** (`G-…`)를 복사합니다.
+2. Vercel 프로젝트 → **Settings** → **Environment Variables**에 추가합니다.
+   - Name: `NEXT_PUBLIC_GA_MEASUREMENT_ID`
+   - Value: `G-XXXXXXXXXX` (실제 ID)
+   - Environment: Production (Preview도 필요하면 동일하게 추가)
+3. 재배포 후 **GA4 → 보고서 → 실시간**에서 본인 접속이 보이는지 확인합니다.
+4. 값이 비어 있으면 앱은 정상 동작하고 GA 스크립트만 로드하지 않습니다.
 
 ## UI / 브랜드
 
