@@ -13,14 +13,12 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 @RequiredArgsConstructor
 public class NaverNewsClient {
 
-    private static final String NAVER_NEWS_URL = "https://openapi.naver.com/v1/search/news.json";
-
     private final WebClient webClient;
     private final AppProperties appProperties;
 
-    public NaverNewsResponse fetchNews() {
-        AppProperties.News news = appProperties.getNews();
+    public NaverNewsResponse searchNews(String query, int display, int start) {
         AppProperties.Naver naver = appProperties.getNaver();
+        String sort = appProperties.getNews().getSort();
 
         try {
             NaverNewsResponse response = webClient.get()
@@ -28,9 +26,10 @@ public class NaverNewsClient {
                             .scheme("https")
                             .host("openapi.naver.com")
                             .path("/v1/search/news.json")
-                            .queryParam("query", news.getQuery())
-                            .queryParam("display", news.getDisplay())
-                            .queryParam("sort", news.getSort())
+                            .queryParam("query", query)
+                            .queryParam("display", display)
+                            .queryParam("start", start)
+                            .queryParam("sort", sort)
                             .build())
                     .header("X-Naver-Client-Id", naver.getClientId())
                     .header("X-Naver-Client-Secret", naver.getClientSecret())
@@ -43,10 +42,16 @@ public class NaverNewsClient {
             }
             return response;
         } catch (WebClientResponseException e) {
-            log.error("네이버 뉴스 API 호출 실패: status={}, body={}", e.getStatusCode(), e.getResponseBodyAsString());
+            log.error(
+                    "네이버 뉴스 API 호출 실패: query={}, start={}, status={}, body={}",
+                    query,
+                    start,
+                    e.getStatusCode(),
+                    e.getResponseBodyAsString()
+            );
             throw e;
         } catch (Exception e) {
-            log.error("네이버 뉴스 API 호출 중 오류 발생", e);
+            log.error("네이버 뉴스 API 호출 중 오류: query={}, start={}", query, start, e);
             throw e;
         }
     }

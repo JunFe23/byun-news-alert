@@ -22,10 +22,21 @@ app:
   telegram:
     bot-token: ${TELEGRAM_BOT_TOKEN}
     chat-id: ${TELEGRAM_CHAT_ID}
+    alert-player-names: ${TELEGRAM_ALERT_PLAYER_NAMES:변준형}
   news:
-    query: 변준형
-    display: 20
+    mode: ${APP_NEWS_MODE:watch}
+    from-date: ${APP_NEWS_FROM_DATE:2026-05-18}
     sort: date
+    watch:
+      display: 20
+      queries:
+        - KBL FA
+        - 프로농구 FA
+        - 자유계약선수
+        - 변준형
+        - 정관장 FA
+    backfill:
+      display: 100
 
 logging:
   level:

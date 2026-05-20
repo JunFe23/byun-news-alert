@@ -13,6 +13,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -26,8 +27,8 @@ public class TelegramAlertService {
     private final WebClient webClient;
     private final AppProperties appProperties;
 
-    public boolean sendAlert(NewsItem item) {
-        String message = buildMessage(item);
+    public boolean sendAlert(NewsItem item, List<String> playerNames) {
+        String message = buildMessage(item, playerNames);
         String botToken = appProperties.getTelegram().getBotToken();
         String chatId = appProperties.getTelegram().getChatId();
         String url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
@@ -55,7 +56,10 @@ public class TelegramAlertService {
         }
     }
 
-    private String buildMessage(NewsItem item) {
+    private String buildMessage(NewsItem item, List<String> playerNames) {
+        String players = playerNames == null || playerNames.isEmpty()
+                ? "—"
+                : String.join(", ", playerNames);
         String keywords = item.getMatchedKeywords() == null
                 ? ""
                 : Arrays.stream(item.getMatchedKeywords()).collect(Collectors.joining(", "));
@@ -64,15 +68,16 @@ public class TelegramAlertService {
                 : item.getPubDate().format(PUB_DATE_FORMAT);
 
         return """
-                🏀 변준형 FA 새 뉴스
+                🏀 KBL FA 새 뉴스
 
                 [제목]
                 %s
 
+                관련 선수: %s
                 매칭 키워드: %s
                 발행일: %s
 
                 %s
-                """.formatted(item.getTitle(), keywords, pubDate, item.getLink()).strip();
+                """.formatted(item.getTitle(), players, keywords, pubDate, item.getLink()).strip();
     }
 }

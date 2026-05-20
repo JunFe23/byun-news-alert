@@ -29,6 +29,9 @@ jobs:
             - name: Run collector
               run: ./gradlew bootRun --no-daemon
               env:
+                  APP_NEWS_MODE: watch
+                  APP_NEWS_FROM_DATE: '2026-05-18'
+                  TELEGRAM_ALERT_PLAYER_NAMES: 변준형
                   NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
                   NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
                   SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}

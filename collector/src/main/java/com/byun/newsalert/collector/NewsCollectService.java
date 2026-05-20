@@ -2,76 +2,213 @@ package com.byun.newsalert.collector;
 
 import com.byun.newsalert.collector.dto.NaverNewsItem;
 import com.byun.newsalert.collector.dto.NaverNewsResponse;
-import com.byun.newsalert.news.NewsItem;
-import com.byun.newsalert.news.NewsItemRepository;
+import com.byun.newsalert.config.AppProperties;
+import com.byun.newsalert.fa.FaPlayer;
+import com.byun.newsalert.fa.FaPlayerRepository;
+import com.byun.newsalert.fa.FaTeam;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NewsCollectService {
 
+    private static final int NAVER_MAX_START = 1000;
+
+    private final AppProperties appProperties;
     private final NaverNewsClient naverNewsClient;
-    private final NewsFilterService newsFilterService;
-    private final NewsItemRepository newsItemRepository;
-    private final TelegramAlertService telegramAlertService;
+    private final FaPlayerRepository faPlayerRepository;
+    private final PlayerRelevanceService playerRelevanceService;
+    private final NewsPersistenceService newsPersistenceService;
 
-    @Transactional
     public void collectOnce() {
-        log.info("뉴스 수집 시작");
+        String mode = appProperties.getNews().getMode();
+        log.info("뉴스 수집 시작: mode={}, fromDate={}", mode, appProperties.getNews().getFromDate());
 
-        NaverNewsResponse response = naverNewsClient.fetchNews();
-        List<NaverNewsItem> fetched = response.getItems() == null ? List.of() : response.getItems();
-        log.info("네이버 API 조회 결과 개수: {}", fetched.size());
-
-        List<NewsFilterService.FilteredNews> relevant = new ArrayList<>();
-        for (NaverNewsItem item : fetched) {
-            newsFilterService.filter(item).ifPresent(relevant::add);
+        if ("backfill".equalsIgnoreCase(mode)) {
+            collectBackfill();
+        } else {
+            collectWatch();
         }
-        log.info("관련 뉴스 개수: {}", relevant.size());
 
-        int savedCount = 0;
-        int alertCount = 0;
+        log.info("뉴스 수집 완료");
+    }
 
-        for (NewsFilterService.FilteredNews filtered : relevant) {
-            if (newsItemRepository.existsByLink(filtered.link())) {
-                log.debug("이미 저장된 뉴스 건너뜀: link={}", filtered.link());
+    private void collectWatch() {
+        List<FaPlayer> players = faPlayerRepository.findAllWithTeam();
+        if (players.isEmpty()) {
+            log.warn("fa_players가 비어 있습니다. seed SQL을 먼저 적용하세요.");
+            return;
+        }
+
+        OffsetDateTime fromDate = resolveFromDateTime();
+        List<String> queries = appProperties.getNews().getWatch().getQueries();
+        int display = appProperties.getNews().getWatch().getDisplay();
+
+        CollectStats stats = new CollectStats();
+        Set<String> processedLinks = new HashSet<>();
+
+        for (String query : queries) {
+            log.info("watch 검색: query={}", query);
+            NaverNewsResponse response = naverNewsClient.searchNews(query, display, 1);
+            List<NaverNewsItem> items = itemsOrEmpty(response);
+            stats.fetched += items.size();
+            log.info("네이버 API 조회 결과: query={}, count={}", query, items.size());
+
+            for (NaverNewsItem item : items) {
+                processItem(item, players, fromDate, "watch", processedLinks, stats);
+            }
+        }
+
+        logStats("watch", stats);
+    }
+
+    private void collectBackfill() {
+        List<FaPlayer> players = faPlayerRepository.findAllWithTeam();
+        if (players.isEmpty()) {
+            log.warn("fa_players가 비어 있습니다. seed SQL을 먼저 적용하세요.");
+            return;
+        }
+
+        OffsetDateTime fromDate = resolveFromDateTime();
+        int display = appProperties.getNews().getBackfill().getDisplay();
+
+        CollectStats stats = new CollectStats();
+        Set<String> processedLinks = new HashSet<>();
+
+        for (FaPlayer player : players) {
+            FaTeam team = player.getTeam();
+            if (team == null) {
+                log.warn("팀 정보 없음, 선수 스킵: playerId={}, name={}", player.getId(), player.getPlayerName());
                 continue;
             }
 
-            NewsItem entity = NewsItem.builder()
-                    .title(filtered.title())
-                    .description(filtered.description())
-                    .link(filtered.link())
-                    .originalLink(filtered.originalLink())
-                    .publisher(filtered.publisher())
-                    .pubDate(filtered.pubDate())
-                    .matchedKeywords(filtered.matchedKeywords().toArray(String[]::new))
-                    .alertSent(false)
-                    .build();
+            List<String> queries = List.of(
+                    player.getPlayerName() + " FA",
+                    player.getPlayerName() + " " + team.getShortName(),
+                    player.getPlayerName() + " 프로농구"
+            );
 
-            NewsItem saved = newsItemRepository.save(entity);
-            savedCount++;
-            log.info("신규 뉴스 저장: link={}, title={}", saved.getLink(), saved.getTitle());
+            for (String query : queries) {
+                log.info("backfill 검색: player={}, query={}", player.getPlayerName(), query);
+                int start = 1;
+                boolean stopQuery = false;
 
-            if (telegramAlertService.sendAlert(saved)) {
-                saved.setAlertSent(true);
-                newsItemRepository.save(saved);
-                alertCount++;
-                log.info("Telegram 알림 발송 완료: link={}", saved.getLink());
-            } else {
-                log.warn("Telegram 알림 발송 실패, is_alert_sent=false 유지: link={}", saved.getLink());
+                while (!stopQuery && start <= NAVER_MAX_START) {
+                    NaverNewsResponse response = naverNewsClient.searchNews(query, display, start);
+                    List<NaverNewsItem> items = itemsOrEmpty(response);
+                    if (items.isEmpty()) {
+                        break;
+                    }
+
+                    stats.fetched += items.size();
+                    log.info("backfill API 결과: player={}, query={}, start={}, count={}",
+                            player.getPlayerName(), query, start, items.size());
+
+                    for (NaverNewsItem item : items) {
+                        NewsTextUtils.ParsedArticle parsed = NewsTextUtils.parseArticle(item);
+                        if (parsed.pubDate() != null && parsed.pubDate().isBefore(fromDate)) {
+                            stopQuery = true;
+                            log.info("fromDate 이전 기사 도달, 검색 중단: player={}, query={}, pubDate={}",
+                                    player.getPlayerName(), query, parsed.pubDate());
+                            break;
+                        }
+                        processItem(item, players, fromDate, "backfill", processedLinks, stats);
+                    }
+
+                    if (stopQuery || items.size() < display) {
+                        break;
+                    }
+                    start += display;
+                }
             }
         }
 
-        log.info("신규 저장 개수: {}", savedCount);
-        log.info("알림 발송 개수: {}", alertCount);
-        log.info("뉴스 수집 완료");
+        logStats("backfill", stats);
+    }
+
+    private void processItem(
+            NaverNewsItem item,
+            List<FaPlayer> players,
+            OffsetDateTime fromDate,
+            String mode,
+            Set<String> processedLinks,
+            CollectStats stats
+    ) {
+        NewsTextUtils.ParsedArticle parsed = NewsTextUtils.parseArticle(item);
+        if (parsed.link() == null || parsed.link().isBlank()) {
+            return;
+        }
+
+        if (parsed.pubDate() == null || parsed.pubDate().isBefore(fromDate)) {
+            return;
+        }
+
+        String text = NewsTextUtils.buildText(parsed.title(), parsed.description());
+        List<FaPlayer> matchedPlayers = playerRelevanceService.findMatchingPlayers(text, players);
+        if (matchedPlayers.isEmpty()) {
+            return;
+        }
+
+        stats.relevant++;
+
+        if (processedLinks.contains(parsed.link())) {
+            NewsPersistenceService.SaveResult result =
+                    newsPersistenceService.persist(parsed, matchedPlayers,
+                            playerRelevanceService.collectMatchedKeywords(text, matchedPlayers),
+                            mode);
+            stats.mentionsAdded += result.mentionsAdded();
+            return;
+        }
+
+        List<String> keywords = playerRelevanceService.collectMatchedKeywords(text, matchedPlayers);
+        NewsPersistenceService.SaveResult result =
+                newsPersistenceService.persist(parsed, matchedPlayers, keywords, mode);
+
+        processedLinks.add(parsed.link());
+        if (result.newlySaved()) {
+            stats.saved++;
+            log.info("신규 뉴스 저장: link={}, title={}, players={}",
+                    parsed.link(), parsed.title(), playerNames(matchedPlayers));
+        }
+        if (result.alerted()) {
+            stats.alerted++;
+        }
+        stats.mentionsAdded += result.mentionsAdded();
+    }
+
+    private OffsetDateTime resolveFromDateTime() {
+        LocalDate from = LocalDate.parse(appProperties.getNews().getFromDate());
+        return from.atStartOfDay(ZoneOffset.of("+09:00")).toOffsetDateTime();
+    }
+
+    private List<NaverNewsItem> itemsOrEmpty(NaverNewsResponse response) {
+        return response.getItems() == null ? List.of() : response.getItems();
+    }
+
+    private List<String> playerNames(List<FaPlayer> players) {
+        return players.stream().map(FaPlayer::getPlayerName).toList();
+    }
+
+    private void logStats(String mode, CollectStats stats) {
+        log.info("[{}] API 조회 {}건, 관련 {}건, 신규 저장 {}건, 알림 {}건, 멘션 추가 {}건",
+                mode, stats.fetched, stats.relevant, stats.saved, stats.alerted, stats.mentionsAdded);
+    }
+
+    private static class CollectStats {
+        int fetched;
+        int relevant;
+        int saved;
+        int alerted;
+        int mentionsAdded;
     }
 }
