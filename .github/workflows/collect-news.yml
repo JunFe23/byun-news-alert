@@ -1,9 +1,10 @@
 name: Collect KBL FA News
 
 on:
-    # UTC 기준. 정각/15분대 혼잡을 피하기 위해 7/22/37/52분에 실행 (약 15분 간격)
+    # Primary trigger is external cron-job.org via workflow_dispatch. Native schedule is fallback.
+    # UTC. 정각 혼잡을 피하기 위해 매시 13분에 1회 실행 (fallback)
     schedule:
-        - cron: '7,22,37,52 * * * *'
+        - cron: '13 * * * *'
     workflow_dispatch:
 
 concurrency:

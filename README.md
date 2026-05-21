@@ -4,11 +4,11 @@
 
 - **collector** — Spring Boot 배치 (네이버 뉴스 API → Supabase → Telegram)
 - **web** — Next.js 공개 피드 (별도 디렉토리)
-- **GitHub Actions** — watch 모드 약 15분 주기 실행 (UTC)
+- **GitHub Actions** — watch 모드 (cron-job.org 10분 주기 + Actions fallback)
 
 ## 프로젝트 개요
 
-1. GitHub Actions가 주기적으로 collector를 **watch** 모드로 실행합니다.
+1. **cron-job.org**가 10분마다 GitHub Actions `workflow_dispatch`로 collector를 실행합니다. (native schedule은 1시간마다 fallback)
 2. collector는 `fa_players`에 등록된 선수 기준으로 기사 관련성을 판단합니다.
 3. `APP_NEWS_FROM_DATE`(기본 `2026-05-18`) 이후 기사만 저장합니다.
 4. `news_items`에 저장하고, `news_player_mentions`에 선수–기사 관계를 기록합니다.
@@ -260,7 +260,8 @@ APP_NAVER_MAX_RETRIES=3 \
 
 워크플로: `.github/workflows/collect-news.yml`
 
-- 스케줄: `7,22,37,52 * * * *` (UTC, 약 15분 간격). GitHub Actions schedule은 UTC 기준이며, 정각·15분대 혼잡을 피하기 위해 7/22/37/52분으로 설정합니다.
+- **주 실행:** [cron-job.org](https://cron-job.org)에서 10분마다 `workflow_dispatch` API 호출 (GitHub PAT 필요)
+- **fallback:** native schedule `13 * * * *` (UTC, 매시 13분·1시간 간격). 정각 혼잡을 피하기 위해 13분에 실행
 - `APP_NEWS_MODE=watch`, `APP_NEWS_FROM_DATE=2026-05-18` 명시
 - `workflow_dispatch` 수동 실행 가능
 
