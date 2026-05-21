@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ADMIN_CONTRACT_STATUS_OPTIONS,
   type AdminContractStatus,
 } from "@/lib/adminFaPlayers";
+import {
+  formatAmountComma,
+  parseAmountInput,
+} from "@/lib/formatAmountInput";
 import { formatContractAmount } from "@/lib/formatContractAmount";
 import {
   buildStatusFilterOptions,
@@ -26,7 +30,12 @@ type StatusFilterId =
   | "계약미체결"
   | "미정";
 
-type SaveState = "idle" | "saving" | "success" | "error";
+const SAVE_FEEDBACK_MS = 5000;
+
+type SaveFeedback = {
+  kind: "success" | "error";
+  message: string;
+};
 
 function initialContractStatus(
   value: string | null | undefined,
@@ -60,25 +69,68 @@ function PlayerAdminCard({
   const [newTeamId, setNewTeamId] = useState<string>(
     player.new_team_id != null ? String(player.new_team_id) : "",
   );
-  const [contractAmount, setContractAmount] = useState<string>(
-    player.contract_amount != null ? String(player.contract_amount) : "",
+  const [contractAmountValue, setContractAmountValue] = useState<number | null>(
+    () => player.contract_amount ?? null,
+  );
+  const [amountDisplay, setAmountDisplay] = useState(() =>
+    formatAmountComma(player.contract_amount),
   );
   const [contractNote, setContractNote] = useState(player.contract_note ?? "");
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState<SaveFeedback | null>(null);
+  const feedbackGenRef = useRef(0);
+  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearFeedbackTimer = useCallback(() => {
+    if (feedbackTimeoutRef.current != null) {
+      clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = null;
+    }
+  }, []);
+
+  const showFeedback = useCallback(
+    (kind: SaveFeedback["kind"], message: string) => {
+      clearFeedbackTimer();
+      const gen = ++feedbackGenRef.current;
+      setFeedback({ kind, message });
+      feedbackTimeoutRef.current = setTimeout(() => {
+        if (feedbackGenRef.current === gen) {
+          setFeedback(null);
+          feedbackTimeoutRef.current = null;
+        }
+      }, SAVE_FEEDBACK_MS);
+    },
+    [clearFeedbackTimer],
+  );
+
+  useEffect(() => {
+    return () => {
+      clearFeedbackTimer();
+    };
+  }, [clearFeedbackTimer]);
 
   useEffect(() => {
     setContractStatus(initialContractStatus(player.contract_status));
     setNewTeamId(
       player.new_team_id != null ? String(player.new_team_id) : "",
     );
-    setContractAmount(
-      player.contract_amount != null ? String(player.contract_amount) : "",
-    );
+    const amount = player.contract_amount ?? null;
+    setContractAmountValue(amount);
+    setAmountDisplay(formatAmountComma(amount));
     setContractNote(player.contract_note ?? "");
-    setSaveState("idle");
-    setErrorMessage(null);
-  }, [player]);
+  }, [
+    player.id,
+    player.contract_status,
+    player.new_team_id,
+    player.contract_amount,
+    player.contract_note,
+  ]);
+
+  const handleAmountChange = (raw: string) => {
+    const parsed = parseAmountInput(raw);
+    setContractAmountValue(parsed);
+    setAmountDisplay(parsed == null ? "" : formatAmountComma(parsed));
+  };
 
   const displayBucket = normalizeContractStatus(
     player.contract_status,
@@ -90,20 +142,11 @@ function PlayerAdminCard({
       : "—";
 
   const handleSave = async () => {
-    setSaveState("saving");
-    setErrorMessage(null);
+    setIsSaving(true);
+    clearFeedbackTimer();
+    setFeedback(null);
 
-    const amountTrimmed = contractAmount.trim();
-    let parsedAmount: number | null = null;
-    if (amountTrimmed !== "") {
-      const n = Number(amountTrimmed);
-      if (!Number.isFinite(n) || n < 0) {
-        setSaveState("error");
-        setErrorMessage("저장 실패");
-        return;
-      }
-      parsedAmount = n;
-    }
+    const parsedAmount = contractAmountValue;
 
     try {
       const res = await fetch(`/api/admin/fa-players/${player.id}`, {
@@ -119,17 +162,16 @@ function PlayerAdminCard({
       });
 
       if (!res.ok) {
-        setSaveState("error");
-        setErrorMessage("저장 실패");
+        showFeedback("error", "저장 실패");
         return;
       }
 
-      setSaveState("success");
+      showFeedback("success", "반영 완료");
       onSaved();
-      window.setTimeout(() => setSaveState("idle"), 2500);
     } catch {
-      setSaveState("error");
-      setErrorMessage("저장 실패");
+      showFeedback("error", "저장 실패");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -214,14 +256,13 @@ function PlayerAdminCard({
             계약금액 (원)
           </span>
           <input
-            type="number"
-            min={0}
-            step={1}
+            type="text"
             inputMode="numeric"
-            placeholder="비우면 미입력"
+            autoComplete="off"
+            placeholder="예: 600,000,000"
             className="w-full rounded-xl border border-brand-border bg-white px-3 py-2 text-sm"
-            value={contractAmount}
-            onChange={(e) => setContractAmount(e.target.value)}
+            value={amountDisplay}
+            onChange={(e) => handleAmountChange(e.target.value)}
           />
         </label>
 
@@ -240,19 +281,19 @@ function PlayerAdminCard({
           <button
             type="button"
             onClick={() => void handleSave()}
-            disabled={saveState === "saving"}
+            disabled={isSaving}
             className="rounded-xl bg-brand-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-primary-dark disabled:opacity-60"
           >
-            {saveState === "saving" ? "저장 중…" : "저장"}
+            {isSaving ? "저장 중…" : "저장"}
           </button>
-          {saveState === "success" ? (
+          {feedback?.kind === "success" ? (
             <span className="text-sm font-medium text-emerald-700">
-              반영 완료
+              {feedback.message}
             </span>
           ) : null}
-          {saveState === "error" && errorMessage ? (
+          {feedback?.kind === "error" ? (
             <span className="text-sm font-medium text-red-700">
-              {errorMessage}
+              {feedback.message}
             </span>
           ) : null}
         </div>
