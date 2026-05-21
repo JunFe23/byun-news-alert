@@ -57,7 +57,7 @@ export async function fetchFaPlayers(): Promise<FaPlayer[]> {
   const { data, error } = await supabase
     .from("fa_players")
     .select(
-      "id, team_id, player_name, status, contract_status, new_team_id, contract_note, contract_amount, status_updated_at, created_at",
+      "id, team_id, player_name, status, contract_status, new_team_id, contract_note, contract_amount, contract_years, status_updated_at, created_at",
     )
     .order("team_id", { ascending: true })
     .order("player_name", { ascending: true });

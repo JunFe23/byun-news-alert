@@ -79,6 +79,7 @@ export default function NewsCard({
         >
           <PreviewImage
             src={previewImageUrl}
+            alt={item.title}
             onError={() => setImageFailed(true)}
           />
         </a>
@@ -196,21 +197,37 @@ function LatestBadge() {
 
 function PreviewImage({
   src,
+  alt,
   onError,
 }: {
   src: string;
+  alt: string;
   onError: () => void;
 }) {
   return (
-    <div className="relative aspect-video w-full overflow-hidden bg-brand-cream">
+    <div className="relative w-full overflow-hidden bg-brand-cream">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt=""
-        className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.015]"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl"
         loading="lazy"
-        onError={onError}
       />
+      <div
+        className="pointer-events-none absolute inset-0 bg-white/45"
+        aria-hidden="true"
+      />
+      <div className="relative z-10 flex min-h-[min(48vw,200px)] items-center justify-center py-2 sm:min-h-[220px]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={alt}
+          className="mx-auto block h-auto w-full max-h-[360px] object-contain sm:max-h-[420px]"
+          loading="lazy"
+          onError={onError}
+        />
+      </div>
     </div>
   );
 }

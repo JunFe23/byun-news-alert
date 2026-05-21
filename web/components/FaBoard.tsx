@@ -4,6 +4,7 @@ import TeamLabel from "@/components/TeamLabel";
 import { buildTeamFilterOptions } from "@/lib/feedFilters";
 import { buildStatusFilterOptions } from "@/lib/filterSort";
 import { formatContractAmount } from "@/lib/formatContractAmount";
+import { formatContractYears } from "@/lib/formatContractYears";
 import { normalizeContractStatus } from "@/lib/faPlayerStatus";
 import { normalizeNumericId } from "@/lib/feedFilters";
 import type { FaPlayer, FaTeam } from "@/lib/types";
@@ -185,14 +186,16 @@ function PlayerCard({
           newTeam={newTeam}
           contractStatus={status}
         />
-        <div className="mt-2.5 flex items-baseline justify-between gap-2">
-          <span className="text-[10px] font-medium text-brand-muted">
-            계약금액
-          </span>
-          <span className="text-xs font-semibold tabular-nums text-[#222]">
+        <dl className="mt-2.5 grid grid-cols-[4.5rem_1fr] gap-x-2 gap-y-1.5 rounded-lg border border-brand-border/50 bg-brand-cream/25 px-3 py-2.5 text-xs">
+          <dt className="text-[10px] font-medium text-brand-muted">계약기간</dt>
+          <dd className="font-semibold tabular-nums text-[#222]">
+            {formatContractYears(player.contract_years)}
+          </dd>
+          <dt className="text-[10px] font-medium text-brand-muted">계약금액</dt>
+          <dd className="font-semibold tabular-nums text-[#222]">
             {formatContractAmount(player.contract_amount)}
-          </span>
-        </div>
+          </dd>
+        </dl>
       </div>
 
       <div className="border-t border-brand-border-subtle/70 px-4 py-3">

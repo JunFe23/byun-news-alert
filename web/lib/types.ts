@@ -38,6 +38,7 @@ export interface FaPlayer {
   new_team_id: number | null;
   contract_note: string | null;
   contract_amount: number | null;
+  contract_years: number | null;
   status_updated_at: string | null;
   created_at?: string;
 }
