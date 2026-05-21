@@ -4,7 +4,7 @@
 
 - **collector** — Spring Boot 배치 (네이버 뉴스 API → Supabase → Telegram)
 - **web** — Next.js 공개 피드 (별도 디렉토리)
-- **GitHub Actions** — watch 모드 5분 주기 실행
+- **GitHub Actions** — watch 모드 약 15분 주기 실행 (UTC)
 
 ## 프로젝트 개요
 
@@ -260,7 +260,7 @@ APP_NAVER_MAX_RETRIES=3 \
 
 워크플로: `.github/workflows/collect-news.yml`
 
-- 스케줄: 5분 간격 (분 단위 cron)
+- 스케줄: `7,22,37,52 * * * *` (UTC, 약 15분 간격). GitHub Actions schedule은 UTC 기준이며, 정각·15분대 혼잡을 피하기 위해 7/22/37/52분으로 설정합니다.
 - `APP_NEWS_MODE=watch`, `APP_NEWS_FROM_DATE=2026-05-18` 명시
 - `workflow_dispatch` 수동 실행 가능
 
