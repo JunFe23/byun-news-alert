@@ -11,17 +11,17 @@ import FilterPills from "@/components/FilterPills";
 import NewsCard from "@/components/NewsCard";
 import SiteFooter from "@/components/SiteFooter";
 import TabsNav from "@/components/TabsNav";
+import { fetchFilteredNewsItems } from "@/lib/newsFeed";
 import {
   fetchFaPlayers,
   fetchFaTeams,
-  fetchNewsItems,
+  fetchNewsItemsTotalCount,
   fetchNewsPlayerMentionsByNewsIds,
 } from "@/lib/supabase";
 import {
   buildFeedMaps,
   buildPlayerFilterOptions,
   buildTeamFilterOptions,
-  filterNewsByMentions,
   getFilterEmptyMessage,
   getRelatedPlayersForNews,
   isPlayerValidForTeamFilter,
@@ -40,7 +40,8 @@ export default function ClientHome() {
   const [players, setPlayers] = useState<FaPlayer[]>([]);
   const [mentions, setMentions] = useState<NewsPlayerMention[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [lastDetectedAt, setLastDetectedAt] = useState<string | null>(null);
+  const [totalNewsCount, setTotalNewsCount] = useState<number | null>(null);
 
   const rawTab = searchParams.get("tab");
   const tab = rawTab === "board" ? "board" : "feed";
@@ -62,26 +63,36 @@ export default function ClientHome() {
   const loadNews = useCallback(async () => {
     setLoadState("loading");
     try {
-      const [news, teamRows, playerRows] = await Promise.all([
-        fetchNewsItems(100),
+      const [teamRows, playerRows] = await Promise.all([
         fetchFaTeams(),
         fetchFaPlayers(),
       ]);
-      setItems(news);
       setTeams(teamRows);
       setPlayers(playerRows);
+
+      void fetchNewsItemsTotalCount().then((count) => {
+        setTotalNewsCount(count);
+      });
+
+      const news = await fetchFilteredNewsItems(
+        teamId,
+        playerId,
+        playerRows,
+        100,
+      );
+      setItems(news);
 
       const newsIds = news.map((n) => n.id);
       const mentionRows = await fetchNewsPlayerMentionsByNewsIds(newsIds);
       setMentions(mentionRows);
 
-      setLastUpdated(new Date().toISOString());
+      setLastDetectedAt(news[0]?.detected_at ?? null);
       setLoadState("success");
     } catch (error) {
       logLoadError("loadNews", error);
       setLoadState("error");
     }
-  }, []);
+  }, [teamId, playerId]);
 
   useEffect(() => {
     void loadNews();
@@ -99,11 +110,6 @@ export default function ClientHome() {
     }
   }, [loadState, playerId, teamId, feedMaps.playerById, setParam]);
 
-  const filteredNews = useMemo(
-    () => filterNewsByMentions(items, feedMaps, teamId, playerId),
-    [items, feedMaps, teamId, playerId],
-  );
-
   const newsCountByPlayerId = useMemo(() => {
     const counts = new Map<number, number>();
     for (const m of mentions) {
@@ -118,9 +124,12 @@ export default function ClientHome() {
     [players, teamId],
   );
 
-  const newsCount = loadState === "success" ? items.length : undefined;
-  const hasAnyNews = loadState === "success" && items.length > 0;
-  const hasFilteredResults = loadState === "success" && filteredNews.length > 0;
+  const displayedNewsCount =
+    loadState === "success" ? items.length : undefined;
+  const hasNewsInDb =
+    loadState === "success" &&
+    ((totalNewsCount ?? 0) > 0 || items.length > 0);
+  const hasFeedResults = loadState === "success" && items.length > 0;
   const filterActive = teamId !== "all" || playerId !== "all";
 
   const applySearchParams = useCallback(
@@ -150,8 +159,9 @@ export default function ClientHome() {
       <Header
         loadNews={loadNews}
         loadState={loadState}
-        lastUpdated={lastUpdated}
-        newsCount={newsCount}
+        lastDetectedAt={lastDetectedAt}
+        totalNewsCount={totalNewsCount}
+        displayedNewsCount={displayedNewsCount}
       />
 
       <main className="mx-auto max-w-[640px] px-4 pb-6 pt-6">
@@ -159,9 +169,14 @@ export default function ClientHome() {
 
         {tab === "feed" ? (
           <>
-            {hasAnyNews ? <FeedIntro newsCount={items.length} /> : null}
+            {hasNewsInDb ? (
+              <FeedIntro
+                totalNewsCount={totalNewsCount}
+                displayedNewsCount={items.length}
+              />
+            ) : null}
 
-            {hasAnyNews ? (
+            {hasNewsInDb ? (
               <>
                 <FilterPills
                   label="팀 필터"
@@ -182,18 +197,18 @@ export default function ClientHome() {
             {loadState === "error" && (
               <FeedState variant="error" onRetry={loadNews} />
             )}
-            {loadState === "success" && !hasAnyNews && (
+            {loadState === "success" && !hasNewsInDb && (
               <FeedState variant="empty" />
             )}
-            {loadState === "success" && hasAnyNews && !hasFilteredResults && (
+            {loadState === "success" && hasNewsInDb && !hasFeedResults && (
               <FilterEmptyState
                 message={getFilterEmptyMessage(teamId, playerId)}
               />
             )}
 
-            {hasFilteredResults ? (
+            {hasFeedResults ? (
               <ul className="flex flex-col gap-6">
-                {filteredNews.map((item, index) => (
+                {items.map((item, index) => (
                   <li key={item.id}>
                     <NewsCard
                       item={item}

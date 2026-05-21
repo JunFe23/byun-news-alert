@@ -3,12 +3,12 @@ export function formatContractAmount(
   amount: number | string | null | undefined,
 ): string {
   if (amount === null || amount === undefined || amount === "") {
-    return "미입력";
+    return "-";
   }
 
   const n = typeof amount === "number" ? amount : Number(amount);
   if (!Number.isFinite(n) || n <= 0) {
-    return "미입력";
+    return "-";
   }
 
   const eok = Math.floor(n / 100_000_000);

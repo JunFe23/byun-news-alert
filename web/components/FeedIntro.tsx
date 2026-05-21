@@ -1,8 +1,19 @@
 interface FeedIntroProps {
-  newsCount?: number;
+  totalNewsCount: number | null;
+  displayedNewsCount: number;
 }
 
-export default function FeedIntro({ newsCount }: FeedIntroProps) {
+export default function FeedIntro({
+  totalNewsCount,
+  displayedNewsCount,
+}: FeedIntroProps) {
+  const countHint =
+    totalNewsCount !== null
+      ? ` · 전체 ${totalNewsCount}건 수집, 최근 ${displayedNewsCount}건 표시`
+      : displayedNewsCount > 0
+        ? ` · 최근 ${displayedNewsCount}건 표시`
+        : "";
+
   return (
     <section className="mb-7" aria-label="피드 소개">
       <p className="text-[10px] font-semibold uppercase tracking-label text-brand-primary">
@@ -13,11 +24,8 @@ export default function FeedIntro({ newsCount }: FeedIntroProps) {
       </p>
       <p className="mt-1 text-xs leading-relaxed text-brand-muted">
         네이버 스포츠 농구 기사가 감지되면 피드에 쌓입니다.
-        {typeof newsCount === "number" && newsCount > 0 ? (
-          <span className="text-brand-primary/80">
-            {" "}
-            · 지금 {newsCount}건의 기사가 있습니다.
-          </span>
+        {countHint ? (
+          <span className="text-brand-primary/80">{countHint}</span>
         ) : null}
       </p>
       <div className="feed-divider mt-5" />

@@ -8,15 +8,17 @@ type LoadState = "loading" | "success" | "error";
 interface HeaderProps {
   loadNews: () => Promise<void>;
   loadState: LoadState;
-  lastUpdated: string | null;
-  newsCount?: number;
+  lastDetectedAt: string | null;
+  totalNewsCount: number | null;
+  displayedNewsCount?: number;
 }
 
 export default function Header({
   loadNews,
   loadState,
-  lastUpdated,
-  newsCount,
+  lastDetectedAt,
+  totalNewsCount,
+  displayedNewsCount,
 }: HeaderProps) {
   const isRefreshing = loadState === "loading";
 
@@ -30,8 +32,9 @@ export default function Header({
         <HeaderRow loadNews={loadNews} isRefreshing={isRefreshing} />
         <StatusBar
           loadState={loadState}
-          lastUpdated={lastUpdated}
-          newsCount={newsCount}
+          lastDetectedAt={lastDetectedAt}
+          totalNewsCount={totalNewsCount}
+          displayedNewsCount={displayedNewsCount}
           isRefreshing={isRefreshing}
         />
       </div>
@@ -78,21 +81,46 @@ function HeaderRow({
 
 function StatusBar({
   loadState,
-  lastUpdated,
-  newsCount,
+  lastDetectedAt,
+  totalNewsCount,
+  displayedNewsCount,
   isRefreshing,
 }: {
   loadState: LoadState;
-  lastUpdated: string | null;
-  newsCount?: number;
+  lastDetectedAt: string | null;
+  totalNewsCount: number | null;
+  displayedNewsCount?: number;
   isRefreshing: boolean;
 }) {
   const showMeta =
-    (lastUpdated && loadState === "success") ||
-    newsCount !== undefined ||
+    (lastDetectedAt && loadState === "success") ||
+    displayedNewsCount !== undefined ||
     isRefreshing;
 
   if (!showMeta) return null;
+
+  const countLine =
+    loadState === "success" && displayedNewsCount !== undefined ? (
+      totalNewsCount !== null ? (
+        <>
+          전체{" "}
+          <span className="font-medium text-brand-primary">{totalNewsCount}</span>
+          건 수집 · 최근{" "}
+          <span className="font-medium text-brand-primary">
+            {displayedNewsCount}
+          </span>
+          건 표시
+        </>
+      ) : (
+        <>
+          최근{" "}
+          <span className="font-medium text-brand-primary">
+            {displayedNewsCount}
+          </span>
+          건 표시
+        </>
+      )
+    ) : null;
 
   return (
     <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-brand-border-subtle/80 pt-3">
@@ -102,19 +130,16 @@ function StatusBar({
           피드를 갱신하는 중
         </span>
       ) : null}
-      {loadState === "success" && lastUpdated ? (
+      {loadState === "success" && lastDetectedAt ? (
         <span className="text-[11px] text-brand-muted">
           마지막 감지{" "}
           <time className="font-medium text-[#3d3d3d]">
-            {formatKstCompact(lastUpdated)}
+            {formatKstCompact(lastDetectedAt)}
           </time>
         </span>
       ) : null}
-      {loadState === "success" && newsCount !== undefined ? (
-        <span className="text-[11px] text-brand-muted">
-          <span className="font-medium text-brand-primary">{newsCount}</span>
-          건 수집됨
-        </span>
+      {countLine ? (
+        <span className="text-[11px] text-brand-muted">{countLine}</span>
       ) : null}
     </div>
   );

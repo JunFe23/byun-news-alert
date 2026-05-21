@@ -21,15 +21,105 @@ export function getSupabase(): SupabaseClient {
   return client;
 }
 
+const NEWS_ITEM_SELECT =
+  "id, title, description, link, original_link, publisher, pub_date, detected_at, matched_keywords, is_alert_sent, created_at";
+
+/** news_items 전체 건수 (필터와 무관). 실패 시 null */
+export async function fetchNewsItemsTotalCount(): Promise<number | null> {
+  try {
+    const supabase = getSupabase();
+    const { count, error } = await supabase
+      .from("news_items")
+      .select("id", { count: "exact", head: true });
+
+    if (error) {
+      console.error("[fetchNewsItemsTotalCount]", error.message);
+      return null;
+    }
+    return count ?? null;
+  } catch (err) {
+    console.error("[fetchNewsItemsTotalCount]", err);
+    return null;
+  }
+}
+
 export async function fetchNewsItems(limit = 50): Promise<NewsItem[]> {
   const supabase = getSupabase();
 
   const { data, error } = await supabase
     .from("news_items")
-    .select(
-      "id, title, description, link, original_link, publisher, pub_date, detected_at, matched_keywords, is_alert_sent, created_at",
-    )
+    .select(NEWS_ITEM_SELECT)
     .order("detected_at", { ascending: false })
+    .order("pub_date", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as NewsItem[];
+}
+
+export async function fetchNewsItemIdsByPlayerId(
+  playerId: number,
+): Promise<number[]> {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from("news_player_mentions")
+    .select("news_item_id")
+    .eq("player_id", playerId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const ids = new Set<number>();
+  for (const row of data ?? []) {
+    const id = Number(row.news_item_id);
+    if (Number.isFinite(id)) ids.add(id);
+  }
+  return [...ids];
+}
+
+export async function fetchNewsItemIdsByPlayerIds(
+  playerIds: number[],
+): Promise<number[]> {
+  if (playerIds.length === 0) return [];
+
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from("news_player_mentions")
+    .select("news_item_id")
+    .in("player_id", playerIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const ids = new Set<number>();
+  for (const row of data ?? []) {
+    const id = Number(row.news_item_id);
+    if (Number.isFinite(id)) ids.add(id);
+  }
+  return [...ids];
+}
+
+export async function fetchNewsItemsByIds(
+  newsIds: number[],
+  limit = 100,
+): Promise<NewsItem[]> {
+  if (newsIds.length === 0) return [];
+
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from("news_items")
+    .select(NEWS_ITEM_SELECT)
+    .in("id", newsIds)
+    .order("detected_at", { ascending: false })
+    .order("pub_date", { ascending: false, nullsFirst: false })
     .limit(limit);
 
   if (error) {

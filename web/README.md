@@ -124,8 +124,9 @@ npm start
 ## 화면 동작
 
 - 상단 탭: **뉴스 피드** / **FA 현황판**
-- `detected_at` 기준 최신 100건 조회
-- 팀·선수 필터 (`news_player_mentions` 기반)
+- **뉴스 피드**: 기본적으로 `news_items` 최신 100건만 표시 (`detected_at` DESC, `pub_date` 보조)
+- **팀·선수 필터**: 전체 최신 100건을 클라이언트에서 거르지 않습니다. `news_player_mentions` → `fa_players` 관계로 조건에 맞는 `news_item_id`를 Supabase에서 먼저 찾은 뒤, 그 중 최신 100건을 조회합니다. 오래된 기사라도 해당 선수/팀과 연결되면 필터 결과에 포함됩니다.
+- **상단 건수**: `news_items` 전체 count(별도 head 조회) + 현재 화면에 로딩된 건수 — 예: `전체 128건 수집 · 최근 100건 표시`. count 조회 실패 시 `최근 n건 표시`만 표시합니다.
 - 로딩 / 빈 목록 / 오류 상태 처리
 - 기사 대표 이미지: `/api/link-preview` Open Graph 추출
 
@@ -135,7 +136,7 @@ npm start
 
 - fetch 타임아웃 5초, 실패 시 텍스트 카드만 표시
 - `Cache-Control: public, s-maxage=86400, stale-while-revalidate=604800`
-- 썸네일은 `object-fit: contain`으로 원본 비율을 유지하며 잘리지 않게 표시 (최대 높이 제한)
+- 썸네일은 **블러 배경 + 전면 contain** 구조로 원본 비율을 유지하며 잘리지 않게 표시 (모바일 max-height 약 360px, 데스크톱 약 420px)
 
 ## FA 현황판
 
