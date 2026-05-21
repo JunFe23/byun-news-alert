@@ -7,7 +7,7 @@
 - Next.js App Router
 - TypeScript
 - Tailwind CSS
-- Supabase JS (anon key만 사용)
+- Supabase JS (공개 화면: anon key / 관리자 수정: API Route + service role key)
 
 ## 환경변수
 
@@ -16,8 +16,10 @@
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 Measurement ID (예: `G-XXXXXXXXXX`, 선택) |
+| `ADMIN_PASSWORD` | `/admin` 관리자 비밀번호 (서버 전용) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (서버 전용, **NEXT_PUBLIC_ 금지**) |
 
-**주의:** service role key, DB password, Telegram token, Naver secret은 이 앱에 넣지 마세요.
+**주의:** `SUPABASE_SERVICE_ROLE_KEY`는 클라이언트에 노출되면 안 됩니다. DB password, Telegram token, Naver secret도 이 앱에 넣지 마세요.
 
 로컬에서는 `web/.env.local` 파일로 설정합니다 (git에 커밋하지 않음).
 
@@ -27,6 +29,8 @@
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
+ADMIN_PASSWORD=change-me
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
 ## Supabase RLS
@@ -95,6 +99,8 @@ npm start
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `NEXT_PUBLIC_GA_MEASUREMENT_ID` (GA4 유입 분석, 선택)
+   - `ADMIN_PASSWORD` (관리자 페이지 비밀번호)
+   - `SUPABASE_SERVICE_ROLE_KEY` (관리자 API 전용 — **절대 `NEXT_PUBLIC_` 접두사 사용 금지**)
 4. Deploy 후 발급된 URL을 공유합니다.
 
 ### GA4 (Vercel)
@@ -134,4 +140,15 @@ npm start
 - 팀별 선수 목록, 계약 상태·새 팀·메모·관련 뉴스 수
 - **관련 뉴스 보기** → 뉴스 피드 + 해당 선수 필터
 
-`contract_status`, `new_team_id`, `contract_note`, `status_updated_at`는 **DB에서 수동 관리**합니다.
+`contract_status`, `new_team_id`, `contract_note`, `status_updated_at`는 **관리자 페이지에서 수동 반영**합니다.
+
+## 관리자 페이지 (`/admin`)
+
+계약 체결 현황(계약 상태·계약팀·계약금액·메모)을 모바일에서도 수정할 수 있는 관리 화면입니다. 공개 홈에는 링크를 두지 않으며, 주소를 직접 입력해 접속합니다.
+
+1. 로컬: `web/.env.local`에 `ADMIN_PASSWORD`, `SUPABASE_SERVICE_ROLE_KEY`를 추가합니다.
+2. Vercel: 위 두 변수를 **Production** (필요 시 Preview) 환경에 설정한 뒤 재배포합니다.
+3. 브라우저에서 `https://<your-domain>/admin` 접속 → 비밀번호 입력 → 선수 카드에서 수정 후 **저장**.
+
+- 수정 요청은 `PATCH /api/admin/fa-players/[id]` 로만 처리되며, service role key는 서버 API Route에서만 사용합니다.
+- 비밀번호 검증은 서버의 `ADMIN_PASSWORD`와 비교합니다 (클라이언트 번들에 비밀번호 환경변수를 넣지 않음).
