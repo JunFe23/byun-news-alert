@@ -11,6 +11,7 @@ import {
   parseAmountInput,
 } from "@/lib/formatAmountInput";
 import { formatContractAmount } from "@/lib/formatContractAmount";
+import { formatContractYears } from "@/lib/formatContractYears";
 import {
   buildStatusFilterOptions,
   sortPlayersForFilter,
@@ -49,6 +50,31 @@ function initialContractStatus(
   return "미정";
 }
 
+function initialContractYearsInput(years: number | null | undefined): string {
+  if (years == null || !Number.isFinite(years) || years <= 0) {
+    return "";
+  }
+  return String(Math.trunc(years));
+}
+
+/** 빈 값 → null, 양의 정수 → number, 그 외 비어 있지 않으면 invalid */
+function parseContractYearsInput(
+  input: string,
+): { ok: true; value: number | null } | { ok: false } {
+  const trimmed = input.trim();
+  if (trimmed === "") {
+    return { ok: true, value: null };
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    return { ok: false };
+  }
+  const n = Number.parseInt(trimmed, 10);
+  if (n <= 0) {
+    return { ok: true, value: null };
+  }
+  return { ok: true, value: n };
+}
+
 function PlayerAdminCard({
   player,
   teams,
@@ -74,6 +100,9 @@ function PlayerAdminCard({
   );
   const [amountDisplay, setAmountDisplay] = useState(() =>
     formatAmountComma(player.contract_amount),
+  );
+  const [contractYearsInput, setContractYearsInput] = useState(() =>
+    initialContractYearsInput(player.contract_years),
   );
   const [contractNote, setContractNote] = useState(player.contract_note ?? "");
   const [isSaving, setIsSaving] = useState(false);
@@ -117,12 +146,14 @@ function PlayerAdminCard({
     const amount = player.contract_amount ?? null;
     setContractAmountValue(amount);
     setAmountDisplay(formatAmountComma(amount));
+    setContractYearsInput(initialContractYearsInput(player.contract_years));
     setContractNote(player.contract_note ?? "");
   }, [
     player.id,
     player.contract_status,
     player.new_team_id,
     player.contract_amount,
+    player.contract_years,
     player.contract_note,
   ]);
 
@@ -147,6 +178,12 @@ function PlayerAdminCard({
     setFeedback(null);
 
     const parsedAmount = contractAmountValue;
+    const parsedYears = parseContractYearsInput(contractYearsInput);
+    if (!parsedYears.ok) {
+      showFeedback("error", "저장 실패");
+      setIsSaving(false);
+      return;
+    }
 
     try {
       const res = await fetch(`/api/admin/fa-players/${player.id}`, {
@@ -156,6 +193,7 @@ function PlayerAdminCard({
           adminPassword,
           contract_status: contractStatus,
           new_team_id: newTeamId === "" ? null : Number(newTeamId),
+          contract_years: parsedYears.value,
           contract_amount: parsedAmount,
           contract_note: contractNote.trim() === "" ? null : contractNote.trim(),
         }),
@@ -201,6 +239,12 @@ function PlayerAdminCard({
             <dt className="inline">계약팀 </dt>
             <dd className="inline font-medium text-brand-text">
               {newTeamLabel}
+            </dd>
+          </div>
+          <div>
+            <dt className="inline">계약기간 </dt>
+            <dd className="inline font-medium text-brand-text">
+              {formatContractYears(player.contract_years)}
             </dd>
           </div>
           <div>
@@ -251,20 +295,51 @@ function PlayerAdminCard({
           </select>
         </label>
 
-        <label className="block text-sm">
-          <span className="mb-1 block text-brand-text-muted">
-            계약금액 (원)
-          </span>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="예: 600,000,000"
-            className="w-full rounded-xl border border-brand-border bg-white px-3 py-2 text-sm"
-            value={amountDisplay}
-            onChange={(e) => handleAmountChange(e.target.value)}
-          />
-        </label>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="mb-1 block text-brand-text-muted">계약년수</span>
+            <div className="relative">
+              <input
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="2"
+                className="w-full rounded-xl border border-brand-border bg-white py-2 pl-3 pr-9 text-sm"
+                value={contractYearsInput}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") {
+                    setContractYearsInput("");
+                    return;
+                  }
+                  if (/^\d+$/.test(v)) {
+                    setContractYearsInput(v);
+                  }
+                }}
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-brand-text-muted">
+                년
+              </span>
+            </div>
+          </label>
+
+          <label className="block text-sm">
+            <span className="mb-1 block text-brand-text-muted">
+              계약금액 (원)
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="예: 600,000,000"
+              className="w-full rounded-xl border border-brand-border bg-white px-3 py-2 text-sm"
+              value={amountDisplay}
+              onChange={(e) => handleAmountChange(e.target.value)}
+            />
+          </label>
+        </div>
 
         <label className="block text-sm">
           <span className="mb-1 block text-brand-text-muted">메모</span>

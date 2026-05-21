@@ -3,7 +3,7 @@ export function formatContractYears(
   years: number | null | undefined,
 ): string {
   if (years == null || !Number.isFinite(years) || years <= 0) {
-    return "미입력";
+    return "-";
   }
   return `${Math.trunc(years)}년`;
 }

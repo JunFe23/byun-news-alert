@@ -14,6 +14,7 @@ const MAX_CONTRACT_STATUS_LENGTH = 32;
 export type AdminFaPlayerUpdateFields = {
   contract_status: AdminContractStatus;
   new_team_id: number | null;
+  contract_years: number | null;
   contract_amount: number | null;
   contract_note: string | null;
 };
@@ -36,6 +37,27 @@ function parseNullableTeamId(value: unknown): number | null | undefined {
   if (typeof value === "string" && /^\d+$/.test(value)) {
     const n = Number(value);
     return n > 0 ? n : undefined;
+  }
+  return undefined;
+}
+
+function parseNullableContractYears(value: unknown): number | null | undefined {
+  if (value === null || value === "") {
+    return null;
+  }
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return value > 0 ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      return null;
+    }
+    if (!/^\d+$/.test(trimmed)) {
+      return undefined;
+    }
+    const n = Number.parseInt(trimmed, 10);
+    return n > 0 ? n : null;
   }
   return undefined;
 }
@@ -99,6 +121,11 @@ export function parseAdminFaPlayerUpdateBody(body: unknown): ParseResult {
     return { ok: false, error: "Invalid new_team_id" };
   }
 
+  const contractYears = parseNullableContractYears(record.contract_years);
+  if (contractYears === undefined) {
+    return { ok: false, error: "Invalid contract_years" };
+  }
+
   const contractAmount = parseNullableAmount(record.contract_amount);
   if (contractAmount === undefined) {
     return { ok: false, error: "Invalid contract_amount" };
@@ -114,6 +141,7 @@ export function parseAdminFaPlayerUpdateBody(body: unknown): ParseResult {
     data: {
       contract_status: statusTrimmed,
       new_team_id: newTeamId,
+      contract_years: contractYears,
       contract_amount: contractAmount,
       contract_note: contractNote,
     },

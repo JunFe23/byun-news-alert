@@ -146,7 +146,9 @@ npm start
 
 ## 관리자 페이지 (`/admin`)
 
-계약 체결 현황(계약 상태·계약팀·계약금액·메모)을 모바일에서도 수정할 수 있는 관리 화면입니다. 공개 홈에는 링크를 두지 않으며, 주소를 직접 입력해 접속합니다.
+계약 체결 현황(계약 상태·계약팀·계약년수·계약금액·메모)을 모바일에서도 수정할 수 있는 관리 화면입니다. 공개 홈에는 링크를 두지 않으며, 주소를 직접 입력해 접속합니다.
+
+관리자가 수정하는 `fa_players` 컬럼: `contract_status`, `new_team_id`, `contract_years`, `contract_amount`, `contract_note`, `status_updated_at`(저장 시 자동 갱신).
 
 1. 로컬: `web/.env.local`에 `ADMIN_PASSWORD`, `SUPABASE_SERVICE_ROLE_KEY`를 추가합니다.
 2. Vercel: 위 두 변수를 **Production** (필요 시 Preview) 환경에 설정한 뒤 재배포합니다.
