@@ -21,6 +21,12 @@ type ImgPriorityProps = {
   fetchPriority: "high" | "auto";
 };
 
+/** 모바일·데스크톱 이미지 영역 (contain, LCP 정책 유지) */
+const IMAGE_BOX_CLASS =
+  "relative aspect-[16/9] w-full max-h-[420px] min-h-[min(52vw,220px)] overflow-hidden sm:max-h-[480px] sm:min-h-[240px]";
+const FOREGROUND_IMG_CLASS =
+  "mx-auto h-auto max-h-[min(58vw,410px)] w-full object-contain sm:max-h-[460px]";
+
 function imagePriorityProps(priority: boolean): ImgPriorityProps {
   return priority
     ? { loading: "eager", fetchPriority: "high" }
@@ -215,7 +221,7 @@ function LatestBadge() {
 function ImagePlaceholder() {
   return (
     <div
-      className="aspect-[16/9] w-full max-h-[360px] min-h-[min(48vw,200px)] bg-gradient-to-br from-brand-cream via-[#ebe8e4] to-brand-primary/[0.08] sm:max-h-[420px] sm:min-h-[220px]"
+      className={`${IMAGE_BOX_CLASS} bg-gradient-to-br from-brand-cream via-[#ebe8e4] to-brand-primary/[0.08]`}
       aria-hidden
     />
   );
@@ -236,19 +242,21 @@ function PreviewImage({
 
   if (priority) {
     return (
-      <div className="relative aspect-[16/9] w-full max-h-[360px] min-h-[min(48vw,200px)] overflow-hidden bg-gradient-to-br from-brand-cream via-[#ebe8e4] to-brand-primary/[0.08] sm:max-h-[420px] sm:min-h-[220px]">
+      <div
+        className={`${IMAGE_BOX_CLASS} bg-gradient-to-br from-brand-cream via-[#ebe8e4] to-brand-primary/[0.08]`}
+      >
         <div
           className="pointer-events-none absolute inset-0 bg-white/40"
           aria-hidden
         />
-        <div className="relative z-10 flex h-full min-h-[inherit] items-center justify-center py-2">
+        <div className="relative z-10 flex h-full min-h-[inherit] items-center justify-center py-1.5 sm:py-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
             alt={alt}
             width={640}
-            height={360}
-            className="mx-auto h-auto max-h-[min(52vw,340px)] w-full object-contain sm:max-h-[400px]"
+            height={400}
+            className={FOREGROUND_IMG_CLASS}
             decoding="async"
             onError={onError}
             {...imgProps}
@@ -259,7 +267,7 @@ function PreviewImage({
   }
 
   return (
-    <div className="relative aspect-[16/9] w-full max-h-[360px] min-h-[min(48vw,200px)] overflow-hidden bg-brand-cream sm:max-h-[420px] sm:min-h-[220px]">
+    <div className={`${IMAGE_BOX_CLASS} bg-brand-cream`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
@@ -274,14 +282,14 @@ function PreviewImage({
         className="pointer-events-none absolute inset-0 bg-white/45"
         aria-hidden="true"
       />
-      <div className="relative z-10 flex h-full min-h-[inherit] items-center justify-center py-2">
+      <div className="relative z-10 flex h-full min-h-[inherit] items-center justify-center py-1.5 sm:py-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
           alt={alt}
           width={640}
-          height={360}
-          className="mx-auto h-auto max-h-[min(52vw,340px)] w-full object-contain sm:max-h-[400px]"
+          height={400}
+          className={FOREGROUND_IMG_CLASS}
           decoding="async"
           onError={onError}
           {...imgProps}
