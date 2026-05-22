@@ -117,8 +117,8 @@ export default function FaScoreboard({
 
       <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-2 lg:gap-5">
         <div className="space-y-4">
-          <div className="-mx-0.5 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch]">
-            <div className="grid min-w-[min(100%,300px)] grid-cols-3 gap-2 sm:min-w-0 sm:grid-cols-6">
+          <div className="-mx-0.5 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch] lg:overflow-visible">
+            <div className="grid w-full min-w-[min(100%,300px)] grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-1.5 lg:gap-2">
               {STAT_ITEMS.map((item) => {
                 const count = counts[item.countKey];
                 const isActive =
@@ -135,16 +135,18 @@ export default function FaScoreboard({
                         item.key === "all" ? "all" : item.key,
                       )
                     }
-                    className={`rounded-lg border px-2 py-2 text-left transition ${
+                    className={`w-full min-w-0 rounded-lg border px-1.5 py-2 text-left transition sm:px-2 lg:flex lg:flex-col lg:items-center lg:justify-center lg:text-center ${
                       isActive ? item.activeClassName : item.className
                     }`}
                     aria-pressed={isActive}
                   >
-                    <p className="text-[9px] font-semibold uppercase tracking-wide opacity-90">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide opacity-90 sm:whitespace-nowrap sm:tracking-normal lg:w-full">
                       {item.label}
                     </p>
-                    <p className="mt-0.5 font-mono text-xl font-bold tabular-nums leading-none sm:text-2xl">
-                      {count}
+                    <p className="mt-0.5 font-mono text-xl font-bold tabular-nums leading-none sm:text-2xl lg:mt-1 lg:flex lg:w-full lg:justify-center">
+                      <span className="lg:inline-flex lg:min-w-[3ch] lg:justify-center lg:[font-variant-numeric:proportional-nums]">
+                        {count}
+                      </span>
                     </p>
                   </button>
                 );
@@ -208,10 +210,13 @@ export default function FaScoreboard({
                     onClick={() => onSelectPlayer(entry.playerId)}
                     className="group w-full px-3.5 py-3 text-left transition hover:bg-white/10 sm:px-4"
                   >
-                    <p className="text-[13px] font-medium leading-snug text-white group-hover:text-brand-accent">
-                      {entry.line}
+                    <p className="text-[14px] font-semibold leading-tight text-white group-hover:text-brand-accent">
+                      {entry.playerName}
                     </p>
-                    <p className="mt-1 font-mono text-[10px] tabular-nums text-white/45">
+                    <p className="mt-1 text-[12px] leading-snug text-white/75 group-hover:text-white/90">
+                      {entry.subtitle}
+                    </p>
+                    <p className="mt-1.5 font-mono text-[10px] tabular-nums text-white/45">
                       {formatKstCompact(entry.updatedAt)} 반영
                     </p>
                   </button>

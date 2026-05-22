@@ -12,6 +12,9 @@ const RECENT_LIMIT = 5;
 export type RecentUpdateEntry = {
   playerId: number;
   playerName: string;
+  /** 2줄째: 팀·이적·상태·계약조건 */
+  subtitle: string;
+  /** 한 줄 요약 (접근성·호환) */
   line: string;
   updatedAt: string;
 };
@@ -69,13 +72,12 @@ function teamShortName(team: FaTeam | undefined | null): string {
   return team.short_name?.trim() || team.team_name?.trim() || "—";
 }
 
-function buildRecentUpdateLine(
+function buildRecentUpdateSubtitle(
   player: FaPlayer,
   originTeam: FaTeam | undefined,
   newTeam: FaTeam | null,
   bucket: ContractStatusBucket,
 ): string {
-  const name = player.player_name;
   const originShort = teamShortName(originTeam);
   const newShort = newTeam ? teamShortName(newTeam) : null;
   const terms = formatContractTermsSummary(player);
@@ -84,7 +86,7 @@ function buildRecentUpdateLine(
     bucket === "계약미체결" ||
     (originTeam != null && isDeferredTeam(originTeam))
   ) {
-    return `${name} · 계약미체결`;
+    return "계약미체결";
   }
 
   const isRetention =
@@ -95,7 +97,7 @@ function buildRecentUpdateLine(
 
   if (isRetention) {
     const teamLabel = newShort && newShort !== "—" ? newShort : originShort;
-    return `${name} · ${teamLabel} 잔류 · ${terms}`;
+    return `${teamLabel} 잔류 · ${terms}`;
   }
 
   const isTransfer =
@@ -107,14 +109,11 @@ function buildRecentUpdateLine(
       newShort && newShort !== "—"
         ? `${originShort} → ${newShort}`
         : originShort;
-    return `${name} · ${transfer} · 이적 · ${terms}`;
+    return `${transfer} · 이적 · ${terms}`;
   }
 
   const statusLabel = bucket === "미정" ? "미정" : bucket;
-  if (terms === "조건 미공개") {
-    return `${name} · ${originShort} · ${statusLabel} · ${terms}`;
-  }
-  return `${name} · ${originShort} · ${statusLabel} · ${terms}`;
+  return `${originShort} · ${statusLabel} · ${terms}`;
 }
 
 /** status_updated_at 기준 최근 반영 선수 (DB 변경 없음) */
@@ -152,10 +151,18 @@ export function getRecentUpdates(
         originTeam,
       );
 
+      const subtitle = buildRecentUpdateSubtitle(
+        player,
+        originTeam,
+        newTeam,
+        bucket,
+      );
+
       return {
         playerId: player.id,
         playerName: player.player_name,
-        line: buildRecentUpdateLine(player, originTeam, newTeam, bucket),
+        subtitle,
+        line: `${player.player_name} · ${subtitle}`,
         updatedAt: player.status_updated_at!,
       };
     });
