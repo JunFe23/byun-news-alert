@@ -2,19 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { formatKstDateTime, formatKstShort } from "@/lib/formatDate";
-import type { LinkPreview } from "@/lib/linkPreview";
+import { fetchLinkPreviewImageUrl } from "@/lib/linkPreviewClient";
 import type { RelatedPlayerBadge } from "@/lib/feedFilters";
 import type { NewsItem } from "@/lib/types";
 
 interface NewsCardProps {
   item: NewsItem;
   isLatest?: boolean;
+  /** 첫 카드 LCP: 전면 이미지 eager + high priority, 블러 배경 대신 gradient */
+  imagePriority?: boolean;
+  /** 첫 카드용 선행 fetch URL. undefined=부모 로딩 중, null=없음, string=URL */
+  prefetchedImageUrl?: string | null;
   relatedPlayers?: RelatedPlayerBadge[];
+}
+
+type ImgPriorityProps = {
+  loading: "eager" | "lazy";
+  fetchPriority: "high" | "auto";
+};
+
+function imagePriorityProps(priority: boolean): ImgPriorityProps {
+  return priority
+    ? { loading: "eager", fetchPriority: "high" }
+    : { loading: "lazy", fetchPriority: "auto" };
 }
 
 export default function NewsCard({
   item,
   isLatest = false,
+  imagePriority = false,
+  prefetchedImageUrl,
   relatedPlayers = [],
 }: NewsCardProps) {
   const keywords = item.matched_keywords ?? [];
@@ -22,25 +39,21 @@ export default function NewsCard({
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
+    if (imagePriority && prefetchedImageUrl !== undefined) {
+      setPreviewImageUrl(prefetchedImageUrl);
+      setImageFailed(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function loadPreview() {
       setPreviewImageUrl(null);
       setImageFailed(false);
 
-      try {
-        const response = await fetch(
-          `/api/link-preview?url=${encodeURIComponent(item.link)}`,
-        );
-
-        if (!response.ok) return;
-
-        const data = (await response.json()) as LinkPreview;
-        if (!cancelled && data.imageUrl) {
-          setPreviewImageUrl(data.imageUrl);
-        }
-      } catch {
-        // 미리보기 실패 시 텍스트 카드만 표시
+      const url = await fetchLinkPreviewImageUrl(item.link);
+      if (!cancelled) {
+        setPreviewImageUrl(url);
       }
     }
 
@@ -48,7 +61,7 @@ export default function NewsCard({
     return () => {
       cancelled = true;
     };
-  }, [item.link]);
+  }, [item.link, imagePriority, prefetchedImageUrl]);
 
   const showImage = Boolean(previewImageUrl) && !imageFailed;
   const publisher = item.publisher ?? "출처 미상";
@@ -80,9 +93,12 @@ export default function NewsCard({
           <PreviewImage
             src={previewImageUrl}
             alt={item.title}
+            priority={imagePriority}
             onError={() => setImageFailed(true)}
           />
         </a>
+      ) : imagePriority ? (
+        <ImagePlaceholder />
       ) : null}
 
       <div className="px-4 pb-4 pt-3">
@@ -195,37 +211,80 @@ function LatestBadge() {
   );
 }
 
+/** LCP 후보 카드: 이미지 URL 로딩 전 레이아웃 고정 */
+function ImagePlaceholder() {
+  return (
+    <div
+      className="aspect-[16/9] w-full max-h-[360px] min-h-[min(48vw,200px)] bg-gradient-to-br from-brand-cream via-[#ebe8e4] to-brand-primary/[0.08] sm:max-h-[420px] sm:min-h-[220px]"
+      aria-hidden
+    />
+  );
+}
+
 function PreviewImage({
   src,
   alt,
   onError,
+  priority,
 }: {
   src: string;
   alt: string;
   onError: () => void;
+  priority: boolean;
 }) {
+  const imgProps = imagePriorityProps(priority);
+
+  if (priority) {
+    return (
+      <div className="relative aspect-[16/9] w-full max-h-[360px] min-h-[min(48vw,200px)] overflow-hidden bg-gradient-to-br from-brand-cream via-[#ebe8e4] to-brand-primary/[0.08] sm:max-h-[420px] sm:min-h-[220px]">
+        <div
+          className="pointer-events-none absolute inset-0 bg-white/40"
+          aria-hidden
+        />
+        <div className="relative z-10 flex h-full min-h-[inherit] items-center justify-center py-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={alt}
+            width={640}
+            height={360}
+            className="mx-auto h-auto max-h-[min(52vw,340px)] w-full object-contain sm:max-h-[400px]"
+            decoding="async"
+            onError={onError}
+            {...imgProps}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative w-full overflow-hidden bg-brand-cream">
+    <div className="relative aspect-[16/9] w-full max-h-[360px] min-h-[min(48vw,200px)] overflow-hidden bg-brand-cream sm:max-h-[420px] sm:min-h-[220px]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt=""
         aria-hidden="true"
+        width={640}
+        height={360}
         className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl"
-        loading="lazy"
+        {...imgProps}
       />
       <div
         className="pointer-events-none absolute inset-0 bg-white/45"
         aria-hidden="true"
       />
-      <div className="relative z-10 flex min-h-[min(48vw,200px)] items-center justify-center py-2 sm:min-h-[220px]">
+      <div className="relative z-10 flex h-full min-h-[inherit] items-center justify-center py-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
           alt={alt}
-          className="mx-auto block h-auto w-full max-h-[360px] object-contain sm:max-h-[420px]"
-          loading="lazy"
+          width={640}
+          height={360}
+          className="mx-auto h-auto max-h-[min(52vw,340px)] w-full object-contain sm:max-h-[400px]"
+          decoding="async"
           onError={onError}
+          {...imgProps}
         />
       </div>
     </div>

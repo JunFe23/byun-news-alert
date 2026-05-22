@@ -11,6 +11,7 @@ import FilterPills from "@/components/FilterPills";
 import NewsCard from "@/components/NewsCard";
 import SiteFooter from "@/components/SiteFooter";
 import TabsNav from "@/components/TabsNav";
+import { fetchLinkPreviewImageUrl } from "@/lib/linkPreviewClient";
 import { fetchFilteredNewsItems } from "@/lib/newsFeed";
 import {
   fetchFaPlayers,
@@ -42,6 +43,10 @@ export default function ClientHome() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [lastDetectedAt, setLastDetectedAt] = useState<string | null>(null);
   const [totalNewsCount, setTotalNewsCount] = useState<number | null>(null);
+  /** 첫 뉴스 카드 LCP용 OG 이미지 (undefined=로딩 중) */
+  const [heroImageUrl, setHeroImageUrl] = useState<string | null | undefined>(
+    undefined,
+  );
 
   const rawTab = searchParams.get("tab");
   const tab = rawTab === "board" ? "board" : "feed";
@@ -62,13 +67,20 @@ export default function ClientHome() {
 
   const loadNews = useCallback(async () => {
     setLoadState("loading");
+    setHeroImageUrl(undefined);
     try {
-      const [teamRows, playerRows] = await Promise.all([
-        fetchFaTeams(),
-        fetchFaPlayers(),
-      ]);
-      setTeams(teamRows);
-      setPlayers(playerRows);
+      const needsPlayersFirst = teamId !== "all" || playerId !== "all";
+      let teamRows: FaTeam[] = [];
+      let playerRows: FaPlayer[] = [];
+
+      if (needsPlayersFirst) {
+        [teamRows, playerRows] = await Promise.all([
+          fetchFaTeams(),
+          fetchFaPlayers(),
+        ]);
+        setTeams(teamRows);
+        setPlayers(playerRows);
+      }
 
       void fetchNewsItemsTotalCount().then((count) => {
         setTotalNewsCount(count);
@@ -81,16 +93,35 @@ export default function ClientHome() {
         100,
       );
       setItems(news);
+      setLastDetectedAt(news[0]?.detected_at ?? null);
+
+      const firstLink = news[0]?.link;
+      if (firstLink) {
+        void fetchLinkPreviewImageUrl(firstLink).then((url) => {
+          setHeroImageUrl(url);
+        });
+      } else {
+        setHeroImageUrl(null);
+      }
+
+      if (!needsPlayersFirst) {
+        [teamRows, playerRows] = await Promise.all([
+          fetchFaTeams(),
+          fetchFaPlayers(),
+        ]);
+        setTeams(teamRows);
+        setPlayers(playerRows);
+      }
 
       const newsIds = news.map((n) => n.id);
       const mentionRows = await fetchNewsPlayerMentionsByNewsIds(newsIds);
       setMentions(mentionRows);
 
-      setLastDetectedAt(news[0]?.detected_at ?? null);
       setLoadState("success");
     } catch (error) {
       logLoadError("loadNews", error);
       setLoadState("error");
+      setHeroImageUrl(null);
     }
   }, [teamId, playerId]);
 
@@ -213,6 +244,10 @@ export default function ClientHome() {
                     <NewsCard
                       item={item}
                       isLatest={index === 0 && !filterActive}
+                      imagePriority={index === 0}
+                      prefetchedImageUrl={
+                        index === 0 ? heroImageUrl : undefined
+                      }
                       relatedPlayers={getRelatedPlayersForNews(
                         item.id,
                         feedMaps,
