@@ -121,6 +121,12 @@ npm start
 3. Vercel에 배포된 Production(및 Preview) URL에서 페이지뷰가 수집됩니다. 로컬 `npm run dev`에서는 기본적으로 전송되지 않을 수 있습니다.
 4. GA4(`NEXT_PUBLIC_GA_MEASUREMENT_ID`)와 함께 사용해도 됩니다.
 
+### Vercel Speed Insights
+
+1. Vercel 프로젝트 → **Speed Insights** 탭에서 기능을 활성화합니다.
+2. 이 앱은 `@vercel/speed-insights`의 `<SpeedInsights />`를 `app/layout.tsx`에 포함합니다 (`<Analytics />`와 함께). 별도 환경변수는 필요 없습니다.
+3. Vercel에 배포된 Production(및 Preview) URL의 Core Web Vitals 등 성능 데이터가 수집됩니다. 로컬 `npm run dev`에서는 기본적으로 전송되지 않을 수 있습니다.
+
 ## UI / 브랜드
 
 - **2026 KBL FA 레이더** — KBL 전체 FA 시장을 보는 스포츠 뉴스룸 톤

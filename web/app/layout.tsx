@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Noto_Sans_KR } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body className="min-h-screen">
         {children}
         <Analytics />
+        <SpeedInsights />
         {gaMeasurementId ? (
           <>
             <Script
