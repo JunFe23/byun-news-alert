@@ -114,6 +114,13 @@ npm start
 3. 재배포 후 **GA4 → 보고서 → 실시간**에서 본인 접속이 보이는지 확인합니다.
 4. 값이 비어 있으면 앱은 정상 동작하고 GA 스크립트만 로드하지 않습니다.
 
+### Vercel Web Analytics
+
+1. Vercel 프로젝트 → **Analytics** 탭에서 **Web Analytics**를 활성화합니다.
+2. 이 앱은 `@vercel/analytics`의 `<Analytics />`를 `app/layout.tsx`에 포함합니다. 별도 환경변수는 필요 없습니다.
+3. Vercel에 배포된 Production(및 Preview) URL에서 페이지뷰가 수집됩니다. 로컬 `npm run dev`에서는 기본적으로 전송되지 않을 수 있습니다.
+4. GA4(`NEXT_PUBLIC_GA_MEASUREMENT_ID`)와 함께 사용해도 됩니다.
+
 ## UI / 브랜드
 
 - **2026 KBL FA 레이더** — KBL 전체 FA 시장을 보는 스포츠 뉴스룸 톤

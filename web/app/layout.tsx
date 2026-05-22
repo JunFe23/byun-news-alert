@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Noto_Sans_KR } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -27,6 +28,7 @@ export default function RootLayout({
     <html lang="ko" className={notoSansKr.variable}>
       <body className="min-h-screen">
         {children}
+        <Analytics />
         {gaMeasurementId ? (
           <>
             <Script
