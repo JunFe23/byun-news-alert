@@ -9,7 +9,7 @@ import type { NewsItem } from "@/lib/types";
 interface NewsCardProps {
   item: NewsItem;
   isLatest?: boolean;
-  /** 첫 카드 LCP: 전면 이미지 eager + high priority, 블러 배경 대신 gradient */
+  /** 첫 카드 LCP: 전면 이미지 eager + high priority, 배경 blur는 lazy */
   imagePriority?: boolean;
   /** 첫 카드용 선행 fetch URL. undefined=부모 로딩 중, null=없음, string=URL */
   prefetchedImageUrl?: string | null;
@@ -21,11 +21,16 @@ type ImgPriorityProps = {
   fetchPriority: "high" | "auto";
 };
 
-/** 모바일·데스크톱 이미지 영역 (contain, LCP 정책 유지) */
-const IMAGE_BOX_CLASS =
-  "relative aspect-[16/9] w-full max-h-[420px] min-h-[min(52vw,220px)] overflow-hidden sm:max-h-[480px] sm:min-h-[240px]";
+/** contain + blur 배경 (전면은 h-full 없음 → PC 상하 잘림 방지) */
+const IMAGE_WRAPPER_CLASS =
+  "relative w-full overflow-hidden bg-[#ebe8e4]";
+const BLUR_BG_CLASS =
+  "pointer-events-none absolute inset-0 h-full w-full scale-[1.1] object-cover opacity-55 blur-xl";
+const OVERLAY_CLASS = "pointer-events-none absolute inset-0 bg-white/25";
+const FOREGROUND_STAGE_CLASS =
+  "relative z-10 flex min-h-[min(52vw,200px)] items-center justify-center px-2 py-2.5 sm:min-h-[220px] sm:py-3";
 const FOREGROUND_IMG_CLASS =
-  "mx-auto h-auto max-h-[min(58vw,410px)] w-full object-contain sm:max-h-[460px]";
+  "h-auto w-auto max-w-full object-contain max-h-[min(58vw,420px)] sm:max-h-[480px]";
 
 function imagePriorityProps(priority: boolean): ImgPriorityProps {
   return priority
@@ -220,10 +225,11 @@ function LatestBadge() {
 /** LCP 후보 카드: 이미지 URL 로딩 전 레이아웃 고정 */
 function ImagePlaceholder() {
   return (
-    <div
-      className={`${IMAGE_BOX_CLASS} bg-gradient-to-br from-brand-cream via-[#ebe8e4] to-brand-primary/[0.08]`}
-      aria-hidden
-    />
+    <div className={IMAGE_WRAPPER_CLASS} aria-hidden>
+      <div
+        className={`${FOREGROUND_STAGE_CLASS} bg-gradient-to-br from-brand-cream via-[#ebe8e4] to-brand-primary/[0.08]`}
+      />
+    </div>
   );
 }
 
@@ -238,61 +244,31 @@ function PreviewImage({
   onError: () => void;
   priority: boolean;
 }) {
-  const imgProps = imagePriorityProps(priority);
-
-  if (priority) {
-    return (
-      <div
-        className={`${IMAGE_BOX_CLASS} bg-gradient-to-br from-brand-cream via-[#ebe8e4] to-brand-primary/[0.08]`}
-      >
-        <div
-          className="pointer-events-none absolute inset-0 bg-white/40"
-          aria-hidden
-        />
-        <div className="relative z-10 flex h-full min-h-[inherit] items-center justify-center py-1.5 sm:py-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt={alt}
-            width={640}
-            height={400}
-            className={FOREGROUND_IMG_CLASS}
-            decoding="async"
-            onError={onError}
-            {...imgProps}
-          />
-        </div>
-      </div>
-    );
-  }
+  const foregroundProps = imagePriorityProps(priority);
+  const backgroundLoading = priority ? "lazy" : foregroundProps.loading;
 
   return (
-    <div className={`${IMAGE_BOX_CLASS} bg-brand-cream`}>
+    <div className={IMAGE_WRAPPER_CLASS}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt=""
         aria-hidden="true"
-        width={640}
-        height={360}
-        className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl"
-        {...imgProps}
+        className={BLUR_BG_CLASS}
+        loading={backgroundLoading}
+        fetchPriority="low"
+        decoding="async"
       />
-      <div
-        className="pointer-events-none absolute inset-0 bg-white/45"
-        aria-hidden="true"
-      />
-      <div className="relative z-10 flex h-full min-h-[inherit] items-center justify-center py-1.5 sm:py-2">
+      <div className={OVERLAY_CLASS} aria-hidden="true" />
+      <div className={FOREGROUND_STAGE_CLASS}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
           alt={alt}
-          width={640}
-          height={400}
           className={FOREGROUND_IMG_CLASS}
           decoding="async"
           onError={onError}
-          {...imgProps}
+          {...foregroundProps}
         />
       </div>
     </div>
