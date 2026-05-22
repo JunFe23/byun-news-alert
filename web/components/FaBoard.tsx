@@ -1,4 +1,4 @@
-import FaBoardSummary from "@/components/FaBoardSummary";
+import FaScoreboard from "@/components/FaScoreboard";
 import FilterPills from "@/components/FilterPills";
 import TeamLabel from "@/components/TeamLabel";
 import { buildTeamFilterOptions } from "@/lib/feedFilters";
@@ -69,11 +69,12 @@ export default function FaBoard({
 
   return (
     <div className="space-y-6">
-      <FaBoardSummary
+      <FaScoreboard
         players={players}
         teams={teams}
         statusFilter={statusFilter}
         onStatusFilterChange={onStatusFilterChange}
+        onSelectPlayer={onSelectPlayer}
       />
 
       <BoardFilters

@@ -1,0 +1,162 @@
+import { isDeferredTeam } from "@/lib/filterSort";
+import { formatContractAmount } from "@/lib/formatContractAmount";
+import { formatContractYears } from "@/lib/formatContractYears";
+import {
+  normalizeContractStatus,
+  type ContractStatusBucket,
+} from "@/lib/faPlayerStatus";
+import type { FaPlayer, FaTeam } from "@/lib/types";
+
+const RECENT_LIMIT = 5;
+
+export type RecentUpdateEntry = {
+  playerId: number;
+  playerName: string;
+  line: string;
+  updatedAt: string;
+};
+
+/** 계약기간·금액 요약 (둘 다 없으면 조건 미공개) */
+export function formatContractTermsSummary(player: FaPlayer): string {
+  const hasYears =
+    player.contract_years != null &&
+    Number.isFinite(player.contract_years) &&
+    player.contract_years > 0;
+  const hasAmount =
+    player.contract_amount != null &&
+    Number.isFinite(player.contract_amount) &&
+    player.contract_amount > 0;
+
+  if (!hasYears && !hasAmount) {
+    return "조건 미공개";
+  }
+
+  const parts: string[] = [];
+  if (hasYears) {
+    const yearsLabel = formatContractYears(player.contract_years);
+    if (yearsLabel !== "-") {
+      parts.push(yearsLabel);
+    }
+  }
+  if (hasAmount) {
+    const amountLabel = formatContractAmount(player.contract_amount);
+    if (amountLabel !== "-") {
+      parts.push(amountLabel);
+    }
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : "조건 미공개";
+}
+
+function isInitialFaRecord(player: FaPlayer): boolean {
+  const status = player.contract_status?.trim() ?? "";
+  if (status !== "FA") {
+    return false;
+  }
+  const note = player.contract_note?.trim() ?? "";
+  return (
+    player.new_team_id == null &&
+    (player.contract_amount == null || player.contract_amount <= 0) &&
+    (player.contract_years == null || player.contract_years <= 0) &&
+    note === ""
+  );
+}
+
+function teamShortName(team: FaTeam | undefined | null): string {
+  if (!team) {
+    return "—";
+  }
+  return team.short_name?.trim() || team.team_name?.trim() || "—";
+}
+
+function buildRecentUpdateLine(
+  player: FaPlayer,
+  originTeam: FaTeam | undefined,
+  newTeam: FaTeam | null,
+  bucket: ContractStatusBucket,
+): string {
+  const name = player.player_name;
+  const originShort = teamShortName(originTeam);
+  const newShort = newTeam ? teamShortName(newTeam) : null;
+  const terms = formatContractTermsSummary(player);
+
+  if (
+    bucket === "계약미체결" ||
+    (originTeam != null && isDeferredTeam(originTeam))
+  ) {
+    return `${name} · 계약미체결`;
+  }
+
+  const isRetention =
+    bucket === "잔류" ||
+    (newShort != null &&
+      originShort !== "—" &&
+      newShort === originShort);
+
+  if (isRetention) {
+    const teamLabel = newShort && newShort !== "—" ? newShort : originShort;
+    return `${name} · ${teamLabel} 잔류 · ${terms}`;
+  }
+
+  const isTransfer =
+    bucket === "이적" ||
+    (newShort != null && originShort !== "—" && newShort !== originShort);
+
+  if (isTransfer) {
+    const transfer =
+      newShort && newShort !== "—"
+        ? `${originShort} → ${newShort}`
+        : originShort;
+    return `${name} · ${transfer} · 이적 · ${terms}`;
+  }
+
+  const statusLabel = bucket === "미정" ? "미정" : bucket;
+  if (terms === "조건 미공개") {
+    return `${name} · ${originShort} · ${statusLabel} · ${terms}`;
+  }
+  return `${name} · ${originShort} · ${statusLabel} · ${terms}`;
+}
+
+/** status_updated_at 기준 최근 반영 선수 (DB 변경 없음) */
+export function getRecentUpdates(
+  players: FaPlayer[],
+  teams: FaTeam[],
+  limit = RECENT_LIMIT,
+): RecentUpdateEntry[] {
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+
+  return players
+    .filter((p) => {
+      if (!p.status_updated_at?.trim()) {
+        return false;
+      }
+      if (isInitialFaRecord(p)) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const tb = Date.parse(b.status_updated_at!);
+      const ta = Date.parse(a.status_updated_at!);
+      return tb - ta;
+    })
+    .slice(0, limit)
+    .map((player) => {
+      const originTeam = teamById.get(player.team_id);
+      const newTeam =
+        player.new_team_id != null
+          ? (teamById.get(player.new_team_id) ?? null)
+          : null;
+      const bucket = normalizeContractStatus(
+        player.contract_status,
+        originTeam,
+      );
+
+      return {
+        playerId: player.id,
+        playerName: player.player_name,
+        line: buildRecentUpdateLine(player, originTeam, newTeam, bucket),
+        updatedAt: player.status_updated_at!,
+      };
+    });
+}
