@@ -162,7 +162,7 @@ npm start
 - 계약일자 표시: 있으면 `2026.05.22` 형식, 없으면 `-`
 - 팀 섹션 순서: 각 팀 내 최신 계약일자 선수 기준으로 최신 팀이 위쪽
 - **관련 뉴스 보기** → 뉴스 피드 + 해당 선수 필터
-- FA 전광판 「최근 반영」: `status_updated_at` DESC 유지. `contract_date`가 있으면 부제에 `05.22 계약` 형태로 함께 표시
+- FA 전광판 「최근 계약」: `contract_date` DESC (`status_updated_at`·이름은 동순위 보조). `contract_date` 없거나 `contract_status`가 FA/빈값이면 제외
 
 계약 정보(`contract_status`, `new_team_id`, `contract_years`, `contract_amount`, `contract_date`, `contract_note`)와 `status_updated_at`은 **관리자 페이지(`/admin`)에서 수동 업데이트**합니다. 뉴스 수집(collector)과는 별도입니다.
 

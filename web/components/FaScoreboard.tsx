@@ -1,8 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { formatKstCompact } from "@/lib/formatDate";
-import { getRecentUpdates } from "@/lib/faRecentUpdates";
+import { getRecentContracts } from "@/lib/faRecentContracts";
+import {
+  formatContractDate,
+  formatContractDateShort,
+} from "@/lib/formatContractDate";
 import {
   CONTRACT_STATUS_BUCKETS,
   getStatusCounts,
@@ -85,8 +88,8 @@ export default function FaScoreboard({
 }) {
   const counts = useMemo(() => getStatusCounts(players, teams), [players, teams]);
   const schedule = useMemo(() => getFaScheduleStatus(), []);
-  const recentUpdates = useMemo(
-    () => getRecentUpdates(players, teams),
+  const recentContracts = useMemo(
+    () => getRecentContracts(players, teams),
     [players, teams],
   );
 
@@ -192,18 +195,18 @@ export default function FaScoreboard({
             <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-accent">
               RECENT
             </p>
-            <h3 className="text-sm font-bold">최근 반영</h3>
+            <h3 className="text-sm font-bold">최근 계약</h3>
             <p className="text-[10px] text-white/55">
-              status_updated_at 기준 최근 5명
+              계약일 기준 최신 5명
             </p>
           </div>
-          {recentUpdates.length === 0 ? (
+          {recentContracts.length === 0 ? (
             <p className="px-4 py-6 text-center text-xs text-white/50">
-              아직 반영된 계약 정보가 없습니다.
+              등록된 계약일이 있는 선수가 없습니다.
             </p>
           ) : (
             <ul className="divide-y divide-white/10">
-              {recentUpdates.map((entry) => (
+              {recentContracts.map((entry) => (
                 <li key={entry.playerId}>
                   <button
                     type="button"
@@ -214,10 +217,26 @@ export default function FaScoreboard({
                       {entry.playerName}
                     </p>
                     <p className="mt-1 text-[12px] leading-snug text-white/75 group-hover:text-white/90">
-                      {entry.subtitle}
-                    </p>
-                    <p className="mt-1.5 font-mono text-[10px] tabular-nums text-white/45">
-                      {formatKstCompact(entry.updatedAt)} 반영
+                      {entry.detailParts.map((part, index) => (
+                        <span
+                          key={index}
+                          className={
+                            part.nowrap ? "whitespace-nowrap" : undefined
+                          }
+                        >
+                          {part.text}
+                        </span>
+                      ))}
+                      <span className="whitespace-nowrap">
+                        <span className="lg:hidden">
+                          {" · "}
+                          {formatContractDateShort(entry.contractDate)} 계약
+                        </span>
+                        <span className="hidden lg:inline">
+                          {" · "}
+                          {formatContractDate(entry.contractDate)} 계약
+                        </span>
+                      </span>
                     </p>
                   </button>
                 </li>

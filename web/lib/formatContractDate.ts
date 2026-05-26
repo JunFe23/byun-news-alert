@@ -10,7 +10,7 @@ export function formatContractDate(
   return `${y}.${m}.${d}`;
 }
 
-/** YYYY-MM-DD → 05.22 (최근 반영 등 짧은 표기) */
+/** YYYY-MM-DD → 05.22 (전광판 최근 계약 등 짧은 표기) */
 export function formatContractDateShort(
   date: string | null | undefined,
 ): string | null {
