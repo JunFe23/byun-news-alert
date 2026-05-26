@@ -39,6 +39,8 @@ export interface FaPlayer {
   contract_note: string | null;
   contract_amount: number | null;
   contract_years: number | null;
+  /** Supabase DATE — YYYY-MM-DD */
+  contract_date: string | null;
   status_updated_at: string | null;
   created_at?: string;
 }

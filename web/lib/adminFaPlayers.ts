@@ -16,6 +16,7 @@ export type AdminFaPlayerUpdateFields = {
   new_team_id: number | null;
   contract_years: number | null;
   contract_amount: number | null;
+  contract_date: string | null;
   contract_note: string | null;
 };
 
@@ -78,6 +79,22 @@ function parseNullableAmount(value: unknown): number | null | undefined {
   return undefined;
 }
 
+function parseNullableContractDate(value: unknown): string | null | undefined {
+  if (value === null || value === "") {
+    return null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      return null;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return trimmed;
+    }
+  }
+  return undefined;
+}
+
 function parseContractNote(value: unknown): string | null | undefined {
   if (value === null || value === "") {
     return null;
@@ -131,6 +148,11 @@ export function parseAdminFaPlayerUpdateBody(body: unknown): ParseResult {
     return { ok: false, error: "Invalid contract_amount" };
   }
 
+  const contractDate = parseNullableContractDate(record.contract_date);
+  if (contractDate === undefined) {
+    return { ok: false, error: "Invalid contract_date" };
+  }
+
   const contractNote = parseContractNote(record.contract_note);
   if (contractNote === undefined) {
     return { ok: false, error: "Invalid contract_note" };
@@ -143,6 +165,7 @@ export function parseAdminFaPlayerUpdateBody(body: unknown): ParseResult {
       new_team_id: newTeamId,
       contract_years: contractYears,
       contract_amount: contractAmount,
+      contract_date: contractDate,
       contract_note: contractNote,
     },
   };

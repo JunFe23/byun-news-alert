@@ -2,8 +2,13 @@ import FaScoreboard from "@/components/FaScoreboard";
 import FilterPills from "@/components/FilterPills";
 import TeamLabel from "@/components/TeamLabel";
 import { buildTeamFilterOptions } from "@/lib/feedFilters";
-import { buildStatusFilterOptions } from "@/lib/filterSort";
+import {
+  buildStatusFilterOptions,
+  comparePlayersByContractDate,
+  sortPlayersByContractDate,
+} from "@/lib/filterSort";
 import { formatContractAmount } from "@/lib/formatContractAmount";
+import { formatContractDate } from "@/lib/formatContractDate";
 import { formatContractYears } from "@/lib/formatContractYears";
 import { normalizeContractStatus } from "@/lib/faPlayerStatus";
 import { normalizeNumericId } from "@/lib/feedFilters";
@@ -43,20 +48,22 @@ export default function FaBoard({
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
 
-  const filtered = players.filter((p) => {
-    if (
-      teamFilter !== "all" &&
-      String(normalizeNumericId(p.team_id)) !== teamFilter
-    ) {
-      return false;
-    }
-    if (statusFilter !== "all") {
-      const team = teamById.get(p.team_id);
-      const bucket = normalizeContractStatus(p.contract_status, team);
-      if (bucket !== statusFilter) return false;
-    }
-    return true;
-  });
+  const filtered = sortPlayersByContractDate(
+    players.filter((p) => {
+      if (
+        teamFilter !== "all" &&
+        String(normalizeNumericId(p.team_id)) !== teamFilter
+      ) {
+        return false;
+      }
+      if (statusFilter !== "all") {
+        const team = teamById.get(p.team_id);
+        const bucket = normalizeContractStatus(p.contract_status, team);
+        if (bucket !== statusFilter) return false;
+      }
+      return true;
+    }),
+  );
 
   const grouped = new Map<number, FaPlayer[]>();
   for (const p of filtered) {
@@ -65,7 +72,17 @@ export default function FaBoard({
     grouped.set(p.team_id, list);
   }
 
-  const sortedTeamIds = [...grouped.keys()].sort((a, b) => a - b);
+  const sortedTeamIds = [...grouped.keys()].sort((teamIdA, teamIdB) => {
+    const firstA = grouped.get(teamIdA)?.[0];
+    const firstB = grouped.get(teamIdB)?.[0];
+    if (firstA && firstB) {
+      const cmp = comparePlayersByContractDate(firstA, firstB);
+      if (cmp !== 0) {
+        return cmp;
+      }
+    }
+    return teamIdA - teamIdB;
+  });
 
   return (
     <div className="space-y-6">
@@ -195,6 +212,10 @@ function PlayerCard({
           <dt className="text-[10px] font-medium text-brand-muted">계약금액</dt>
           <dd className="font-semibold tabular-nums text-[#222]">
             {formatContractAmount(player.contract_amount)}
+          </dd>
+          <dt className="text-[10px] font-medium text-brand-muted">계약일자</dt>
+          <dd className="font-semibold tabular-nums text-[#222]">
+            {formatContractDate(player.contract_date)}
           </dd>
         </dl>
       </div>

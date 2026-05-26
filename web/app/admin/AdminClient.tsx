@@ -14,9 +14,10 @@ import { formatContractAmount } from "@/lib/formatContractAmount";
 import { formatContractYears } from "@/lib/formatContractYears";
 import {
   buildStatusFilterOptions,
-  sortPlayersForFilter,
+  sortPlayersByContractDate,
   sortTeamsForFilter,
 } from "@/lib/filterSort";
+import { formatContractDate } from "@/lib/formatContractDate";
 import { normalizeContractStatus } from "@/lib/faPlayerStatus";
 import { fetchFaPlayers, fetchFaTeams } from "@/lib/supabase";
 import type { FaPlayer, FaTeam } from "@/lib/types";
@@ -104,6 +105,9 @@ function PlayerAdminCard({
   const [contractYearsInput, setContractYearsInput] = useState(() =>
     initialContractYearsInput(player.contract_years),
   );
+  const [contractDate, setContractDate] = useState(
+    () => player.contract_date?.trim() ?? "",
+  );
   const [contractNote, setContractNote] = useState(player.contract_note ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<SaveFeedback | null>(null);
@@ -147,6 +151,7 @@ function PlayerAdminCard({
     setContractAmountValue(amount);
     setAmountDisplay(formatAmountComma(amount));
     setContractYearsInput(initialContractYearsInput(player.contract_years));
+    setContractDate(player.contract_date?.trim() ?? "");
     setContractNote(player.contract_note ?? "");
   }, [
     player.id,
@@ -154,6 +159,7 @@ function PlayerAdminCard({
     player.new_team_id,
     player.contract_amount,
     player.contract_years,
+    player.contract_date,
     player.contract_note,
   ]);
 
@@ -195,6 +201,7 @@ function PlayerAdminCard({
           new_team_id: newTeamId === "" ? null : Number(newTeamId),
           contract_years: parsedYears.value,
           contract_amount: parsedAmount,
+          contract_date: contractDate.trim() === "" ? null : contractDate.trim(),
           contract_note: contractNote.trim() === "" ? null : contractNote.trim(),
         }),
       });
@@ -251,6 +258,12 @@ function PlayerAdminCard({
             <dt className="inline">계약금액 </dt>
             <dd className="inline font-medium text-brand-text">
               {formatContractAmount(player.contract_amount)}
+            </dd>
+          </div>
+          <div>
+            <dt className="inline">계약일자 </dt>
+            <dd className="inline font-medium text-brand-text">
+              {formatContractDate(player.contract_date)}
             </dd>
           </div>
         </dl>
@@ -339,6 +352,16 @@ function PlayerAdminCard({
               onChange={(e) => handleAmountChange(e.target.value)}
             />
           </label>
+
+          <label className="block text-sm sm:col-span-2">
+            <span className="mb-1 block text-brand-text-muted">계약일자</span>
+            <input
+              type="date"
+              className="w-full rounded-xl border border-brand-border bg-white px-3 py-2 text-sm"
+              value={contractDate}
+              onChange={(e) => setContractDate(e.target.value)}
+            />
+          </label>
         </div>
 
         <label className="block text-sm">
@@ -411,7 +434,7 @@ export default function AdminClient() {
         fetchFaPlayers(),
       ]);
       setTeams(sortTeamsForFilter(teamsData));
-      setPlayers(sortPlayersForFilter(playersData));
+      setPlayers(sortPlayersByContractDate(playersData));
     } catch {
       setLoadError("데이터를 불러오지 못했습니다.");
     } finally {

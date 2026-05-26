@@ -1,5 +1,6 @@
 import { isDeferredTeam } from "@/lib/filterSort";
 import { formatContractAmount } from "@/lib/formatContractAmount";
+import { formatContractDateShort } from "@/lib/formatContractDate";
 import { formatContractYears } from "@/lib/formatContractYears";
 import {
   normalizeContractStatus,
@@ -51,6 +52,17 @@ export function formatContractTermsSummary(player: FaPlayer): string {
   return parts.length > 0 ? parts.join(" · ") : "조건 미공개";
 }
 
+function appendContractDateSuffix(
+  subtitle: string,
+  player: FaPlayer,
+): string {
+  const short = formatContractDateShort(player.contract_date);
+  if (!short) {
+    return subtitle;
+  }
+  return `${subtitle} · ${short} 계약`;
+}
+
 function isInitialFaRecord(player: FaPlayer): boolean {
   const status = player.contract_status?.trim() ?? "";
   if (status !== "FA") {
@@ -86,7 +98,7 @@ function buildRecentUpdateSubtitle(
     bucket === "계약미체결" ||
     (originTeam != null && isDeferredTeam(originTeam))
   ) {
-    return "계약미체결";
+    return appendContractDateSuffix("계약미체결", player);
   }
 
   const isRetention =
@@ -97,7 +109,7 @@ function buildRecentUpdateSubtitle(
 
   if (isRetention) {
     const teamLabel = newShort && newShort !== "—" ? newShort : originShort;
-    return `${teamLabel} 잔류 · ${terms}`;
+    return appendContractDateSuffix(`${teamLabel} 잔류 · ${terms}`, player);
   }
 
   const isTransfer =
@@ -109,11 +121,14 @@ function buildRecentUpdateSubtitle(
       newShort && newShort !== "—"
         ? `${originShort} → ${newShort}`
         : originShort;
-    return `${transfer} · 이적 · ${terms}`;
+    return appendContractDateSuffix(`${transfer} · 이적 · ${terms}`, player);
   }
 
   const statusLabel = bucket === "미정" ? "미정" : bucket;
-  return `${originShort} · ${statusLabel} · ${terms}`;
+  return appendContractDateSuffix(
+    `${originShort} · ${statusLabel} · ${terms}`,
+    player,
+  );
 }
 
 /** status_updated_at 기준 최근 반영 선수 (DB 변경 없음) */

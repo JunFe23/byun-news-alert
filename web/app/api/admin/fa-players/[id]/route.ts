@@ -57,6 +57,7 @@ export async function PATCH(
         new_team_id: parsed.data.new_team_id,
         contract_years: parsed.data.contract_years,
         contract_amount: parsed.data.contract_amount,
+        contract_date: parsed.data.contract_date,
         contract_note: parsed.data.contract_note,
         status_updated_at: new Date().toISOString(),
       })
