@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -401,6 +402,7 @@ function PlayerAdminCard({
 }
 
 export default function AdminClient() {
+  const router = useRouter();
   const [adminPassword, setAdminPassword] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -503,6 +505,7 @@ export default function AdminClient() {
     setAdminPassword(null);
     setPlayers([]);
     setTeams([]);
+    router.push("/?tab=board");
   };
 
   if (!adminPassword) {
