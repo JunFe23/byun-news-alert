@@ -171,21 +171,43 @@ export default function FaScoreboard({
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-[10px] font-medium text-white/55">
+                <p
+                  className={`text-[10px] font-medium ${
+                    schedule.isCountdownUrgent
+                      ? "text-red-300/90"
+                      : "text-white/55"
+                  }`}
+                >
                   {schedule.countdownPrefix || "남은 기간"}
                 </p>
-                <p className="mt-0.5 font-mono text-2xl font-bold tabular-nums leading-none text-white sm:text-3xl">
+                <p
+                  className={`mt-0.5 font-mono text-2xl font-bold tabular-nums leading-none sm:text-3xl ${
+                    schedule.isCountdownUrgent ? "text-red-400" : "text-white"
+                  }`}
+                >
                   {schedule.countdownShort}
                 </p>
               </div>
             </div>
-            {schedule.nextScheduleLabel ? (
-              <p className="mt-3 border-t border-white/10 pt-3 text-[11px] text-white/75">
-                다음 일정{" "}
-                <span className="font-semibold text-white">
-                  {schedule.nextScheduleLabel}
-                </span>
-              </p>
+            {schedule.nextScheduleTitle ? (
+              <div className="mt-3 border-t border-white/10 pt-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-white/50">
+                  다음 일정
+                </p>
+                <p className="mt-1 text-[12px] font-semibold leading-snug text-white">
+                  {schedule.nextScheduleTitle}
+                  {schedule.nextSchedulePeriod ? (
+                    <span className="ml-1.5 font-normal tabular-nums text-white/85">
+                      {schedule.nextSchedulePeriod}
+                    </span>
+                  ) : null}
+                </p>
+                {schedule.nextScheduleDetail ? (
+                  <p className="mt-1 text-[10px] leading-relaxed text-white/60">
+                    {schedule.nextScheduleDetail}
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>
