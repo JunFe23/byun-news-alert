@@ -31,7 +31,7 @@ type StatusFilterId =
   | "잔류"
   | "이적"
   | "계약미체결"
-  | "미정";
+  | "은퇴";
 
 const SAVE_FEEDBACK_MS = 5000;
 
@@ -49,7 +49,7 @@ function initialContractStatus(
   ) {
     return trimmed as AdminContractStatus;
   }
-  return "미정";
+  return "FA";
 }
 
 function initialContractYearsInput(years: number | null | undefined): string {

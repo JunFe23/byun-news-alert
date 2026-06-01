@@ -69,7 +69,7 @@ export function sortPlayersByContractDate(players: FaPlayer[]): FaPlayer[] {
   return [...players].sort(comparePlayersByContractDate);
 }
 
-const STATUS_ORDER = ["FA", "잔류", "이적", "계약미체결", "미정"] as const;
+const STATUS_ORDER = ["FA", "잔류", "이적", "계약미체결", "은퇴"] as const;
 
 export function buildStatusFilterOptions(): PillOption[] {
   return [

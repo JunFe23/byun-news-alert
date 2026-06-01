@@ -26,7 +26,7 @@ export type ContractStatus =
   | "잔류"
   | "이적"
   | "계약미체결"
-  | "미정"
+  | "은퇴"
   | string;
 
 export interface FaPlayer {

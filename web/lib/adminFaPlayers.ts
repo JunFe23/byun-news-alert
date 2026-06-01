@@ -1,8 +1,9 @@
 export const ADMIN_CONTRACT_STATUS_OPTIONS = [
-  "미정",
+  "FA",
   "잔류",
   "이적",
   "계약미체결",
+  "은퇴",
 ] as const;
 
 export type AdminContractStatus =

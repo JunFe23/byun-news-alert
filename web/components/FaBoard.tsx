@@ -258,8 +258,7 @@ function TeamTransferInfo({
   newTeam: FaTeam | null;
   contractStatus: string;
 }) {
-  const newTeamFallback =
-    contractStatus === "FA" || contractStatus === "미정" ? "미정" : "-";
+  const newTeamFallback = contractStatus === "은퇴" ? "은퇴" : "-";
 
   return (
     <div className="mt-2 w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
@@ -296,7 +295,9 @@ function StatusBadge({ status }: { status: string }) {
           ? "bg-orange-50 text-orange-800 border-orange-100"
           : status === "FA"
             ? "bg-brand-primary/[0.08] text-brand-primary border-brand-primary/15"
-            : "bg-brand-cream text-brand-muted border-brand-border/60";
+            : status === "은퇴"
+              ? "bg-zinc-100 text-zinc-600 border-zinc-200"
+              : "bg-brand-cream text-brand-muted border-brand-border/60";
 
   return (
     <span

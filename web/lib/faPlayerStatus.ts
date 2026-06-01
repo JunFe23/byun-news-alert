@@ -5,7 +5,7 @@ export const CONTRACT_STATUS_BUCKETS = [
   "잔류",
   "이적",
   "계약미체결",
-  "미정",
+  "은퇴",
 ] as const;
 
 export type ContractStatusBucket = (typeof CONTRACT_STATUS_BUCKETS)[number];
@@ -16,7 +16,7 @@ export type StatusCounts = {
   잔류: number;
   이적: number;
   계약미체결: number;
-  미정: number;
+  은퇴: number;
 };
 
 export function normalizeContractStatus(
@@ -28,12 +28,16 @@ export function normalizeContractStatus(
   }
 
   if (typeof contractStatus !== "string") {
-    return "미정";
+    return "FA";
   }
 
   const trimmed = contractStatus.trim();
   if (trimmed === "") {
-    return "미정";
+    return "FA";
+  }
+
+  if (trimmed === "미정") {
+    return "은퇴";
   }
 
   if (
@@ -41,12 +45,12 @@ export function normalizeContractStatus(
     trimmed === "잔류" ||
     trimmed === "이적" ||
     trimmed === "계약미체결" ||
-    trimmed === "미정"
+    trimmed === "은퇴"
   ) {
     return trimmed;
   }
 
-  return "미정";
+  return "FA";
 }
 
 export function getStatusCounts(
@@ -60,7 +64,7 @@ export function getStatusCounts(
     잔류: 0,
     이적: 0,
     계약미체결: 0,
-    미정: 0,
+    은퇴: 0,
   };
 
   for (const player of players) {

@@ -36,7 +36,7 @@ export function isEligibleRecentContract(player: FaPlayer): boolean {
     return false;
   }
   const status = player.contract_status?.trim() ?? "";
-  if (status === "" || status === "FA") {
+  if (status === "" || status === "FA" || status === "은퇴" || status === "미정") {
     return false;
   }
   return true;
@@ -88,7 +88,7 @@ function buildStatusLine(
     return `${transfer} · 이적`;
   }
 
-  const statusLabel = bucket === "미정" ? "미정" : bucket;
+  const statusLabel = bucket;
   return `${originShort} · ${statusLabel}`;
 }
 

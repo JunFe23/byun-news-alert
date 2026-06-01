@@ -64,9 +64,9 @@ const STAT_ITEMS: {
     activeClassName: "border-orange-300 bg-orange-400 text-[#1a1a1a]",
   },
   {
-    key: "미정",
-    label: "미정",
-    countKey: "미정",
+    key: "은퇴",
+    label: "은퇴",
+    countKey: "은퇴",
     className:
       "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
     activeClassName: "border-white/60 bg-white/80 text-[#1a1a1a]",
