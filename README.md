@@ -1,10 +1,13 @@
 # byun-news-alert
 
-2026 KBL **FA 시장** 관련 뉴스를 자동 수집하고, 신규 기사가 있으면 Telegram으로 알려주는 프로젝트입니다.
+> **운영 종료 (2026 KBL FA 시장 종료)** — 뉴스 수집·Telegram 알림·공개 대시보드는 중단되었습니다.  
+> 종료 절차: [`SHUTDOWN.md`](SHUTDOWN.md)
 
-- **collector** — Spring Boot 배치 (네이버 뉴스 API → Supabase → Telegram)
-- **web** — Next.js 공개 피드 (별도 디렉토리)
-- **GitHub Actions** — watch 모드 (cron-job.org 10분 주기 + Actions fallback)
+2026 KBL **FA 시장** 관련 뉴스를 자동 수집하고, 신규 기사가 있으면 Telegram으로 알려주던 프로젝트입니다. (아카이브)
+
+- **collector** — Spring Boot 배치 (네이버 뉴스 API → Supabase → Telegram) — **실행 중단**
+- **web** — Next.js 공개 피드 — **서비스 종료 안내 페이지**
+- **GitHub Actions** — ~~watch 모드~~ **워크플로 삭제됨**
 
 ## 프로젝트 개요
 

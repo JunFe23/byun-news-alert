@@ -15,9 +15,10 @@ const notoSansKr = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: "2026 KBL FA 레이더",
+  title: "2026 KBL FA 레이더 — 서비스 종료",
   description:
-    "2026 KBL FA 시장 뉴스를 팀별·선수별로 모아보는 KBL 뉴스 피드입니다.",
+    "2026 KBL FA 레이더는 FA 시장 종료에 따라 운영을 마쳤습니다.",
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

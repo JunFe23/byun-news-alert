@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
-import AdminClient from "@/app/admin/AdminClient";
+import ServiceEnded from "@/components/ServiceEnded";
 
 export const metadata: Metadata = {
-  title: "FA 계약 현황 관리",
+  title: "서비스 종료",
   robots: { index: false, follow: false },
 };
 
 export default function AdminPage() {
-  return <AdminClient />;
+  return <ServiceEnded />;
 }
